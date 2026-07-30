@@ -23,6 +23,10 @@ import os
 import sys
 import json
 
+# Force UTF-8 output to avoid charmap UnicodeEncodeError on Windows
+if sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
 sys.path.append(PROJECT_ROOT)
 
@@ -109,4 +113,4 @@ def run_pipeline(account_id, auto_approve_hitl=False):
 if __name__ == "__main__":
     # Dummy accounts available: 101, 102, 103 (see data/init_db.py)
     ACCOUNT_ID = 101
-    run_pipeline(ACCOUNT_ID)
+    run_pipeline(ACCOUNT_ID, auto_approve_hitl=True)

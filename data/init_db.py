@@ -26,13 +26,26 @@ PROVIDER = os.getenv("DATABASE_PROVIDER", "sqlite").lower()
 def get_db_connection():
     if PROVIDER == "supabase":
         import psycopg2
-        return psycopg2.connect(
-            host=os.getenv("SUPABASE_DB_HOST"),
-            port=os.getenv("SUPABASE_DB_PORT"),
-            dbname=os.getenv("SUPABASE_DB_NAME"),
-            user=os.getenv("SUPABASE_DB_USER"),
-            password=os.getenv("SUPABASE_DB_PASSWORD")
-        )
+        from urllib.parse import urlparse, unquote
+        
+        host_env = os.getenv("SUPABASE_DB_HOST", "")
+        if host_env.startswith("postgres://") or host_env.startswith("postgresql://"):
+            parsed = urlparse(host_env)
+            return psycopg2.connect(
+                host=parsed.hostname,
+                port=parsed.port,
+                dbname=parsed.path.lstrip("/"),
+                user=unquote(parsed.username) if parsed.username else None,
+                password=unquote(parsed.password) if parsed.password else None
+            )
+        else:
+            return psycopg2.connect(
+                host=host_env,
+                port=os.getenv("SUPABASE_DB_PORT"),
+                dbname=os.getenv("SUPABASE_DB_NAME"),
+                user=os.getenv("SUPABASE_DB_USER"),
+                password=os.getenv("SUPABASE_DB_PASSWORD")
+            )
     return sqlite3.connect(DB_PATH)
 
 

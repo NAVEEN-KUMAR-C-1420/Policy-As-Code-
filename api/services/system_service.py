@@ -8,19 +8,30 @@ def get_health() -> dict:
     return {"status": "ok"}
 
 def get_system_status() -> dict:
-    db_path = os.path.join(PROJECT_ROOT, "data", "finance.db")
-    db_ok = os.path.exists(db_path)
+    provider = os.getenv("DATABASE_PROVIDER", "sqlite").lower()
+    db_ok = False
+    
+    if provider == "supabase":
+        # We assume if the URL is set, the remote DB is active. We don't block health ping on DB introspect.
+        db_ok = bool(os.getenv("SUPABASE_URL") or os.getenv("SUPABASE_DB_HOST"))
+    else:
+        db_path = os.path.join(PROJECT_ROOT, "data", "finance.db")
+        db_ok = os.path.exists(db_path)
     
     agents_dir = os.path.join(PROJECT_ROOT, "agents")
     agents = [d for d in os.listdir(agents_dir) if os.path.isdir(os.path.join(agents_dir, d))] if os.path.exists(agents_dir) else []
     
+    llm_ok = bool(os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY"))
+    
     return {
         "database": "connected" if db_ok else "disconnected",
+        "provider": provider,
+        "llm_configuration": "valid" if llm_ok else "missing",
         "runtime": "active",
         "audit": "enabled",
         "number_of_agents": len(agents),
         "number_of_policies": len(agents),
-        "overall_status": "healthy" if db_ok else "degraded"
+        "overall_status": "healthy" if (db_ok and llm_ok) else "degraded"
     }
 
 def get_system_version() -> dict:

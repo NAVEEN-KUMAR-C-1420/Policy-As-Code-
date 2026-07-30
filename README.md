@@ -82,12 +82,51 @@ SUPABASE_DB_USER=postgres
 SUPABASE_DB_PASSWORD=your_password
 ```
 
-When switching to Supabase, you must re-initialize the database schemas:
-```bash
-python data/init_db.py
-```
+## CI/CD Architecture & Deployment Flow
 
-## Folder Structuress & PII Controls
+This project features a fully automated CI/CD pipeline using **GitHub Actions**, orchestrated inside the `.github/workflows/` directory.
+
+### 1. Continuous Integration (`ci.yml`)
+Runs automatically on every Push and Pull Request to the `main` branch. It strictly enforces:
+- Python syntax compilation
+- Dependency installation
+- API test execution (`api_testing/`)
+- Legacy Governance validation (`test_governance.py`)
+If any of these fail, the build is blocked.
+
+### 2. Security Scans (`security.yml`)
+Runs TruffleHog secrets scanning to ensure no LLM keys (Groq/Anthropic), database passwords, or `.env` files are accidentally committed.
+
+### 3. Continuous Deployment (`deploy.yml`)
+Upon a successful CI pipeline run on the `main` branch, the deployment workflow triggers a web hook to update the live production environment. It then waits for the server to spin up and verifies the live `/health` and `/system/status` endpoints.
+
+## Required Secrets & Environment Variables
+
+### GitHub Secrets
+To allow GitHub Actions to deploy to your hosting provider (e.g., Render), add the following in `Settings > Secrets and variables > Actions`:
+- **`RENDER_DEPLOY_HOOK_URL`**: (Secret) Webhook URL provided by Render to trigger the build.
+- **`PRODUCTION_API_URL`**: (Variable) URL of your live API, e.g., `https://myapp.onrender.com`.
+
+### Production Variables (Render/Host)
+Inside your cloud hosting environment dashboard, you must provide the following:
+- `DATABASE_PROVIDER=supabase`
+- `SUPABASE_DB_HOST=postgresql://postgres.xxx...`
+- `SUPABASE_DB_PORT=5432`
+- `SUPABASE_DB_NAME=postgres`
+- `SUPABASE_DB_USER=postgres`
+- `SUPABASE_DB_PASSWORD=your_password`
+- `GROQ_API_KEY=gsk_yourkey`
+- `TAVILY_API_KEY=tvly-yourkey`
+
+## Immutable Policy Versioning & Rollback
+
+Every time a new policy is deployed via the `/policies/deploy` endpoint, the system guarantees an **immutable version history** in Supabase:
+- **Never Overwritten:** The existing active policy is retained as a historical artifact with its unique SHA hash.
+- **Always Tracked:** The newest policy deployed automatically becomes active.
+- **Audit Ready:** An audit log event is generated capturing who deployed the policy and when.
+- **Instant Rollback:** You can instantly revert to a previous policy using the `/policies/{agent_id}/rollback` endpoint by providing the target version SHA.
+
+## Data Access & PII Controls
 Tools declare which SQLite tables they access and whether they handle PII. If `policy.yaml` restricts an agent to specific `allowed_tables` (e.g., only `transactions`) or sets `pii_allowed: false`, any tool violating these constraints is blocked at runtime.
 
 ## Data Retention
@@ -128,12 +167,4 @@ python test_governance.py
 python orchestrator/run_pipeline.py
 ```
 
-## Intentionally NOT Implemented
-This phase focused solely on a complete local implementation of the policy schema, validation, and runtime enforcement. The following features belong to the next phase:
-- GitHub Actions / CI/CD deployment
-- Git SHA versioning endpoints
-- Policy drift detection
-- Dev/staging/prod policy promotion
-- Pull-Request approval workflows
-- Docker, Kubernetes, and Cloud deployment
-- Web frontend / Authentication UI
+

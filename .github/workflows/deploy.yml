@@ -1,0 +1,53 @@
+name: Deploy Pipeline
+
+on:
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    steps:
+    - name: Trigger Render Deployment
+      run: |
+        if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+          echo "RENDER_DEPLOY_HOOK_URL secret is not set!"
+          exit 1
+        fi
+        curl -X POST -d "" "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+
+    - name: Wait for Deployment
+      run: |
+        echo "Waiting 60 seconds for deployment to initialize..."
+        sleep 60
+
+    - name: Health Check Validation
+      run: |
+        if [ -z "${{ vars.PRODUCTION_API_URL }}" ]; then
+          echo "PRODUCTION_API_URL variable is not set! Skipping health check."
+          exit 0
+        fi
+        echo "Running post-deployment health check against ${{ vars.PRODUCTION_API_URL }}..."
+        
+        # Test /health endpoint
+        response=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.PRODUCTION_API_URL }}/health")
+        if [ "$response" -ne 200 ]; then
+          echo "Deployment failed! Health check returned $response"
+          exit 1
+        fi
+        
+        # Test /system/status endpoint
+        response=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.PRODUCTION_API_URL }}/system/status")
+        if [ "$response" -ne 200 ]; then
+          echo "Deployment failed! System status check returned $response"
+          exit 1
+        fi
+        
+        echo "Post-deployment validation successful!"

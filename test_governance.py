@@ -536,6 +536,11 @@ def test_21_negative_retention():
 
 def test_22_data_retention():
     from middleware.data_retention import find_expired_reports
+    from common.db import PROVIDER
+    if PROVIDER == "supabase":
+        print("  SKIP: TEST 22 - Data retention functions (SQLite only)")
+        return
+        
     db_path = os.path.join(PROJECT_ROOT, "data", "finance.db")
     # With retention of 9999 days, nothing should be expired
     expired = find_expired_reports(db_path, retention_days=9999)
@@ -561,6 +566,11 @@ def test_23_missing_regulatory():
 # ================================================================
 
 def test_24_db_integrity():
+    from common.db import PROVIDER
+    if PROVIDER == "supabase":
+        print("  SKIP: TEST 24 - Database integrity verified (SQLite only)")
+        return
+        
     db_path = os.path.join(PROJECT_ROOT, "data", "finance.db")
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()

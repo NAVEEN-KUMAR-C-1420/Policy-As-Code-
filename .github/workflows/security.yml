@@ -23,7 +23,7 @@ jobs:
           fi
           echo ".env is safely excluded."
 
-      - name: TruffleHog Secret Scanner
+      - name: TruffleHog OSS
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./

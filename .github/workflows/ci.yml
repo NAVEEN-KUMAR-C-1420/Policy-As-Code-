@@ -29,6 +29,12 @@ jobs:
       run: |
         python -m compileall .
 
+    - name: Initialize Test Database
+      env:
+        DATABASE_PROVIDER: sqlite
+      run: |
+        python data/init_db.py
+
     - name: API Testing
       env:
         DATABASE_PROVIDER: sqlite

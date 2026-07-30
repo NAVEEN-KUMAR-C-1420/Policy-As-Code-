@@ -1,18 +1,23 @@
-from pathlib import Path
 import os
 import sys
+from pathlib import Path
 
 from core.paths import BASE_DIR as PROJECT_ROOT
-sys.path.append(PROJECT_ROOT)
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
 
 from middleware.audit_log import read_recent_entries
+
 
 def get_recent_logs(limit: int = 50) -> list:
     return read_recent_entries(limit)
 
+
 def get_logs_for_run(run_id: str) -> list:
     # We simulate run filtering by just getting recent logs
     return read_recent_entries(50)
+
 
 def search_logs(event_type: str = None, agent_id: str = None, decision: str = None, limit: int = 50) -> list:
     logs = read_recent_entries(limit)
@@ -23,6 +28,7 @@ def search_logs(event_type: str = None, agent_id: str = None, decision: str = No
     if decision:
         logs = [log for log in logs if log.get("decision") == decision]
     return logs
+
 
 def export_logs() -> str:
     log_file = PROJECT_ROOT / "logs" / "audit_log.jsonl"

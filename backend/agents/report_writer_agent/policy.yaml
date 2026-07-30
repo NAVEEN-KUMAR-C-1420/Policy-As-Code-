@@ -1,84 +1,53 @@
-# =============================================================
-# Policy: Report Writer Agent
-# =============================================================
-# This file shows all 3 outcomes the interceptor can produce:
-#   - save_report_to_db  -> allowed: true   (ALLOWED at runtime)
-#   - write_report_file  -> allowed: true   (ALLOWED at runtime)
-#   - delete_old_reports -> allowed: false  (BLOCKED at runtime)
-#
-# Schema version: 1.0
-# =============================================================
-
 agent_id: report_writer_agent
-policy_version: "1.0"
-
-# --- Approved LLM models ---
-approved_models:
-  - "openai/gpt-oss-120b"
-  - "gpt-4o-mini"
-  - "claude-3-5-sonnet-20241022"
-
-# --- Tool permissions ---
 allowed_tools:
-  - name: save_report_to_db
-    scope: write
-    resource: sqlite
-    tables: [reports]
-    contains_pii: false
-    allowed: true
-
-  - name: write_report_file
-    scope: write
-    resource: filesystem
-    tables: []
-    contains_pii: false
-    allowed: true
-
-  - name: delete_old_reports
-    scope: delete
-    resource: sqlite
-    tables: [reports]
-    contains_pii: false
-    allowed: false   # explicitly blocked
-
-# --- Denied scopes ---
-denied_scopes:
-  - delete
-
-# --- Guardrails ---
-guardrails:
-  pii_protection: true
-  prompt_injection_protection: true     # metadata-only
-  harmful_content_filter: true          # metadata-only
-
-# --- Human-in-the-loop ---
-hitl:
-  enabled: false
-  risk_threshold: 0.70
-  high_risk_requires_approval: false
-
-# --- Data access governance ---
-data_access:
-  pii_allowed: false
-  allowed_tables:
-    - reports
-
-# --- Data retention ---
-data_retention:
-  reports_days: 90
-  audit_logs_days: 365
-
-# --- Regulatory tags ---
-regulatory_frameworks:
-  - internal-financial-governance
-
-# --- Rate limits ---
-rate_limits:
-  max_calls_per_tool: 5
-
-# --- Audit ---
+- allowed: true
+  contains_pii: false
+  name: save_report_to_db
+  resource: sqlite
+  scope: write
+  tables:
+  - reports
+- allowed: true
+  contains_pii: false
+  name: write_report_file
+  resource: filesystem
+  scope: write
+  tables: []
+- allowed: false
+  contains_pii: false
+  name: delete_old_reports
+  resource: sqlite
+  scope: delete
+  tables:
+  - reports
+approved_models:
+- openai/gpt-oss-120b
+- gpt-4o-mini
+- claude-3-5-sonnet-20241022
 audit:
   enabled: true
+  log_denied_actions: true
   log_inputs: true
   log_outputs: true
-  log_denied_actions: true
+data_access:
+  allowed_tables:
+  - reports
+  pii_allowed: false
+data_retention:
+  audit_logs_days: 365
+  reports_days: 90
+denied_scopes:
+- delete
+guardrails:
+  harmful_content_filter: true
+  pii_protection: true
+  prompt_injection_protection: true
+hitl:
+  enabled: false
+  high_risk_requires_approval: false
+  risk_threshold: 0.7
+policy_version: '1.0'
+rate_limits:
+  max_calls_per_tool: 5
+regulatory_frameworks:
+- internal-financial-governance

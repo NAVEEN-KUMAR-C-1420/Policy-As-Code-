@@ -6,7 +6,7 @@ any LLM API keys, because it calls the guarded tool functions
 directly instead of going through an agent.
 
 Run it with:
-    python test_policy_enforcement.py
+    python -m pytest tests/unit/test_policy.py -v
 
 What it shows:
   1. An ALLOWED tool call  -> passes policy.yaml, runs, gets logged
@@ -20,19 +20,22 @@ import sys
 
 # Ensure PROJECT_ROOT is reachable
 from core.paths import BASE_DIR as PROJECT_ROOT
-sys.path.insert(0, PROJECT_ROOT)
 
-from data.init_db import main as init_db
-init_db()
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+# NOTE: Database initialization is handled by conftest.py session fixture.
 
 from agents.data_collector_agent.dev.tools import guarded_read_transactions
 from agents.report_writer_agent.dev.tools import guarded_delete_old_reports
+
 
 def test_allowed_tool_call():
     """Test that an ALLOWED tool call passes policy.yaml and runs."""
     result = guarded_read_transactions(account_id=101)
     assert result is not None
     assert "BLOCKED BY POLICY" not in str(result)
+
 
 def test_blocked_tool_call():
     """Test that a BLOCKED tool call is denied by policy.yaml and never runs."""

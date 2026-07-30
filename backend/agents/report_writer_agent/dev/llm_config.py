@@ -8,16 +8,19 @@ chat model with policy-enforced model approval.
 
 import os
 import sys
+from pathlib import Path
+
 import yaml
 
-PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..", "..", "..")
-sys.path.append(PROJECT_ROOT)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
 
 from common.llm_loader import get_llm
-from middleware.policy_loader import load_policy
 from middleware.agent_policy_compat import validate_agent_policy_compat
+from middleware.policy_loader import load_policy
 
-AGENT_DIR = os.path.dirname(__file__) / ".."
+AGENT_DIR = Path(__file__).resolve().parent.parent
 AGENT_YAML_PATH = AGENT_DIR / "agent.yaml"
 POLICY_YAML_PATH = AGENT_DIR / "policy.yaml"
 

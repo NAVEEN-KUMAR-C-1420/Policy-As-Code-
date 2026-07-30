@@ -19,26 +19,29 @@ Usage:
     python orchestrator/run_pipeline.py
 """
 
+import json
 import os
 import sys
-import json
 
 # Force UTF-8 output to avoid charmap UnicodeEncodeError on Windows
-if sys.stdout.encoding.lower() != 'utf-8':
-    sys.stdout.reconfigure(encoding='utf-8')
+if sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8")
 
 from core.paths import BASE_DIR as PROJECT_ROOT
-sys.path.append(PROJECT_ROOT)
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
 
 from dotenv import load_dotenv
+
 load_dotenv()  # loads GROQ_API_KEY, TAVILY_API_KEY, etc. from .env
 
 from agents.data_collector_agent.dev.agent import run as run_data_collector
-from agents.risk_analyzer_agent.dev.agent import run as run_risk_analyzer
 from agents.report_writer_agent.dev.agent import run as run_report_writer
+from agents.risk_analyzer_agent.dev.agent import run as run_risk_analyzer
 from agents.risk_analyzer_agent.dev.tools import _calculate_risk_score
-from middleware.policy_loader import load_policy
 from middleware.hitl import check_hitl, request_cli_approval
+from middleware.policy_loader import load_policy
 
 
 def run_pipeline(account_id, auto_approve_hitl=False):
@@ -74,11 +77,11 @@ def run_pipeline(account_id, auto_approve_hitl=False):
         risk_score = risk_result.get("risk_score", 0.0)
     except (json.JSONDecodeError, TypeError):
         risk_score = 0.0
-        print(f"  Warning: Could not parse risk result, using score 0.0")
+        print("  Warning: Could not parse risk result, using score 0.0")
 
-    risk_policy_path = os.path.join(
-        PROJECT_ROOT, "agents", "risk_analyzer_agent", "policy.yaml"
-    )
+    from core.paths import AGENTS_DIR
+
+    risk_policy_path = AGENTS_DIR / "risk_analyzer_agent" / "policy.yaml"
     risk_policy = load_policy(risk_policy_path)
     hitl_result = check_hitl(
         risk_score=risk_score,

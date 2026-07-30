@@ -41,9 +41,7 @@ def check_hitl(risk_score: float, policy: dict, agent_id: str = "") -> dict:
     hitl_config = policy.get("hitl", {})
     hitl_enabled = hitl_config.get("enabled", False)
     risk_threshold = hitl_config.get("risk_threshold", 1.0)
-    high_risk_requires_approval = hitl_config.get(
-        "high_risk_requires_approval", False
-    )
+    high_risk_requires_approval = hitl_config.get("high_risk_requires_approval", False)
 
     result = {
         "approval_required": False,
@@ -53,49 +51,48 @@ def check_hitl(risk_score: float, policy: dict, agent_id: str = "") -> dict:
         "hitl_enabled": hitl_enabled,
     }
 
-    if (
-        hitl_enabled
-        and high_risk_requires_approval
-        and risk_score > risk_threshold
-    ):
+    if hitl_enabled and high_risk_requires_approval and risk_score > risk_threshold:
         result["approval_required"] = True
         result["status"] = "PENDING_HUMAN_APPROVAL"
 
-        write_audit_entry({
-            "agent_id": agent_id,
-            "event_type": "HITL_CHECK",
-            "decision": "HITL_REQUIRED",
-            "reason": (
-                f"Risk score {risk_score:.2f} exceeds threshold "
-                f"{risk_threshold:.2f}"
-            ),
-            "risk_score": risk_score,
-            "risk_threshold": risk_threshold,
-        })
-        
+        write_audit_entry(
+            {
+                "agent_id": agent_id,
+                "event_type": "HITL_CHECK",
+                "decision": "HITL_REQUIRED",
+                "reason": (f"Risk score {risk_score:.2f} exceeds threshold " f"{risk_threshold:.2f}"),
+                "risk_score": risk_score,
+                "risk_threshold": risk_threshold,
+            }
+        )
+
         from common.repositories import HITLRepository
-        HITLRepository.save_request({
-            "conversation_id": "system_generated",
-            "tool_name": "unknown_tool",
-            "risk_score": risk_score,
-            "threshold": risk_threshold,
-            "status": "PENDING_HUMAN_APPROVAL",
-            "reason": f"Risk score {risk_score:.2f} exceeds threshold {risk_threshold:.2f}"
-        })
+
+        HITLRepository.save_request(
+            {
+                "conversation_id": "system_generated",
+                "tool_name": "unknown_tool",
+                "risk_score": risk_score,
+                "threshold": risk_threshold,
+                "status": "PENDING_HUMAN_APPROVAL",
+                "reason": f"Risk score {risk_score:.2f} exceeds threshold {risk_threshold:.2f}",
+            }
+        )
     else:
-        write_audit_entry({
-            "agent_id": agent_id,
-            "event_type": "HITL_CHECK",
-            "decision": "ALLOWED",
-            "reason": (
-                f"Risk score {risk_score:.2f} is within threshold "
-                f"{risk_threshold:.2f}"
-                if hitl_enabled
-                else "HITL is not enabled for this agent"
-            ),
-            "risk_score": risk_score,
-            "risk_threshold": risk_threshold,
-        })
+        write_audit_entry(
+            {
+                "agent_id": agent_id,
+                "event_type": "HITL_CHECK",
+                "decision": "ALLOWED",
+                "reason": (
+                    f"Risk score {risk_score:.2f} is within threshold " f"{risk_threshold:.2f}"
+                    if hitl_enabled
+                    else "HITL is not enabled for this agent"
+                ),
+                "risk_score": risk_score,
+                "risk_threshold": risk_threshold,
+            }
+        )
 
     return result
 

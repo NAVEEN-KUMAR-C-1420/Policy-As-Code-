@@ -41,11 +41,13 @@ reports/*
 !reports/.gitkeep
 
 # ===========================
-# FastAPI
+# FastAPI / Testing
 # ===========================
 .pytest_cache/
 .coverage
 htmlcov/
+tests/reports/*.xml
+backend/tests/reports/*.xml
 
 # ===========================
 # IDE

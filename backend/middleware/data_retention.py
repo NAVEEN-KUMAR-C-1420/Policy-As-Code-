@@ -1,4 +1,5 @@
 from pathlib import Path
+
 """
 Data Retention
 ===============
@@ -20,10 +21,10 @@ Usage:
     )
 """
 
-import os
 import json
+import os
 import sqlite3
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 def find_expired_reports(db_path: str, retention_days: int) -> list:
@@ -42,8 +43,7 @@ def find_expired_reports(db_path: str, retention_days: int) -> list:
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT report_id, account_id, created_at FROM reports "
-        "WHERE created_at < ?",
+        "SELECT report_id, account_id, created_at FROM reports " "WHERE created_at < ?",
         (cutoff,),
     )
     rows = [dict(row) for row in cursor.fetchall()]

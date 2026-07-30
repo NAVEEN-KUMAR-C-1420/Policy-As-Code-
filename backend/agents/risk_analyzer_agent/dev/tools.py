@@ -15,16 +15,19 @@ demonstration. It is NOT a real financial credit/risk model.
 
 import os
 import sys
+from pathlib import Path
 
-PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..", "..", "..")
-sys.path.append(PROJECT_ROOT)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
 
 from langchain_core.tools import StructuredTool
-from common.db import run_query
-from middleware.tool_interceptor import guard_tool
-from middleware.policy_loader import load_policy
 
-AGENT_DIR = os.path.dirname(__file__) / ".."
+from common.db import run_query
+from middleware.policy_loader import load_policy
+from middleware.tool_interceptor import guard_tool
+
+AGENT_DIR = Path(__file__).resolve().parent.parent
 POLICY_PATH = AGENT_DIR / "policy.yaml"
 policy = load_policy(POLICY_PATH)
 
@@ -35,6 +38,7 @@ AGENT_ID = policy.get("agent_id", "risk_analyzer_agent")
 # ------------------------------------------------------------------
 # Step 1: plain python functions - the real tool logic
 # ------------------------------------------------------------------
+
 
 def _read_account_summary(account_id: int) -> str:
     """
@@ -76,10 +80,7 @@ def _calculate_risk_score(account_id: int) -> str:
         (account_id,),
     )
     if not accounts:
-        return (
-            '{"error": "Account not found", "account_id": ' +
-            str(account_id) + '}'
-        )
+        return '{"error": "Account not found", "account_id": ' + str(account_id) + "}"
 
     balance = accounts[0]["balance"]
 
@@ -141,6 +142,7 @@ guarded_calculate_risk = guard_tool(
 # ------------------------------------------------------------------
 # Step 3: expose the guarded functions as LangChain tools
 # ------------------------------------------------------------------
+
 
 def get_tools():
     """Return the list of LangChain tools this agent is allowed to use."""

@@ -7,9 +7,11 @@ a simple run() function for the orchestrator to call.
 
 import os
 import sys
+from pathlib import Path
 
-PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..", "..", "..")
-sys.path.append(PROJECT_ROOT)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
 
 from langchain.agents import create_agent
 
@@ -31,19 +33,13 @@ def build_agent():
     llm = get_agent_llm()
     tools = get_tools()
 
-    return create_agent(
-        model=llm,
-        tools=tools,
-        system_prompt=SYSTEM_PROMPT
-    )
+    return create_agent(model=llm, tools=tools, system_prompt=SYSTEM_PROMPT)
 
 
 def run(account_id: int, collected_data: str) -> str:
     agent = build_agent()
     user_message = (
-        f"Account ID: {account_id}\n\n"
-        f"Data from previous agent:\n{collected_data}\n\n"
-        "Please analyze the risk."
+        f"Account ID: {account_id}\n\n" f"Data from previous agent:\n{collected_data}\n\n" "Please analyze the risk."
     )
     result = agent.invoke({"messages": [{"role": "user", "content": user_message}]})
     return result["messages"][-1].content

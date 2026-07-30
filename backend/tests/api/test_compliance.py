@@ -3,6 +3,7 @@ def test_compliance_status(client):
     assert response.status_code == 200
     assert response.json()["success"] is True
 
+
 def test_compliance_report(client):
     response = client.get("/compliance/report")
     assert response.status_code == 200

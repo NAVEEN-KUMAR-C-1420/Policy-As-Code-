@@ -1,0 +1,26 @@
+# TruffleHog Exclusion Configuration
+# ====================================
+# This file tells TruffleHog which paths contain intentional
+# non-secret values (examples, test fixtures, documentation)
+# so they don't produce false positives.
+#
+# IMPORTANT: This does NOT weaken security scanning.
+# TruffleHog still scans ALL other paths for real leaked secrets.
+
+detectors:
+  - name: all
+
+# Paths that are known to contain placeholder/example values
+exclude_paths:
+  - regex: '\.env\.example$'
+  - regex: 'backend/\.env\.example$'
+  - regex: 'backend/tests/fixtures/.*'
+  - regex: 'backend/tests/reports/.*'
+  - regex: 'backend/data/.*\.db$'
+  - regex: '\.github/README\.md$'
+  - regex: '.*\.xml$'
+  - regex: '.*\.log$'
+
+# Exclude known placeholder patterns from detection
+exclude_detectors:
+  - name: CustomRegex

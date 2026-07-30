@@ -1,0 +1,47 @@
+[project]
+name = "aivar-backend"
+requires-python = ">=3.13"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "--junitxml=tests/reports/junit.xml",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks integration tests requiring external services",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 120
+exclude = [
+    ".venv",
+    "__pycache__",
+    "data/finance.db",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+# E = pycodestyle errors, F = pyflakes, I = isort
+# Intentionally conservative — won't break existing code
+ignore = [
+    "E501",   # line too long (handled by black)
+    "E402",   # module level import not at top of file (needed for sys.path setups)
+    "F401",   # imported but unused (some re-exports are intentional)
+    "F841",   # local variable assigned but never used
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["core", "common", "api", "agents", "middleware", "orchestrator", "data"]
+
+[tool.black]
+line-length = 120
+target-version = ["py313"]

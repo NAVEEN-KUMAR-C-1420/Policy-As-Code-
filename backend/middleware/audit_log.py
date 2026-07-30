@@ -19,10 +19,12 @@ Event types recorded:
 IMPORTANT: This module never logs API keys, secrets, or raw PII.
 """
 
-from common.repositories import AuditRepository
-from datetime import datetime, timezone
-import os
 import json
+import os
+from datetime import datetime, timezone
+
+from common.repositories import AuditRepository
+
 
 def write_audit_entry(entry: dict):
     """
@@ -33,7 +35,7 @@ def write_audit_entry(entry: dict):
     """
     if "timestamp" not in entry:
         entry["timestamp"] = datetime.now(timezone.utc).isoformat()
-    
+
     # Supabase uses JSON fields, but our schema expects stringification if metadata.
     # The repository handles the SQL insert.
     AuditRepository.save(entry)
@@ -44,7 +46,7 @@ def read_recent_entries(n: int = 50) -> list:
     Read the last N entries from the audit log database.
     """
     rows = AuditRepository.get_recent(limit=n)
-    
+
     # Re-map DB row fields back to the expected dictionary formats for testing backwards compatibility.
     entries = []
     for row in rows:
@@ -56,9 +58,9 @@ def read_recent_entries(n: int = 50) -> list:
         if "metadata" in parsed and parsed["metadata"]:
             try:
                 parsed["metadata"] = json.loads(parsed["metadata"])
-            except:
+            except Exception:
                 pass
         entries.append(parsed)
-        
+
     # Re-reverse to put oldest first, as previous logic did (it read file top to bottom and took last N)
     return entries[::-1]

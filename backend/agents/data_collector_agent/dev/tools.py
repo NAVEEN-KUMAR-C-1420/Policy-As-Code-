@@ -14,16 +14,19 @@ This agent has 2 tools, both READ-ONLY:
 
 import os
 import sys
+from pathlib import Path
 
-PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..", "..", "..")
-sys.path.append(PROJECT_ROOT)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
 
 from langchain_core.tools import StructuredTool
-from common.db import run_query
-from middleware.tool_interceptor import guard_tool
-from middleware.policy_loader import load_policy
 
-AGENT_DIR = os.path.dirname(__file__) / ".."
+from common.db import run_query
+from middleware.policy_loader import load_policy
+from middleware.tool_interceptor import guard_tool
+
+AGENT_DIR = Path(__file__).resolve().parent.parent
 POLICY_PATH = AGENT_DIR / "policy.yaml"
 policy = load_policy(POLICY_PATH)
 
@@ -35,23 +38,20 @@ AGENT_ID = policy.get("agent_id", "data_collector_agent")
 # Step 1: plain python functions - the real tool logic
 # ------------------------------------------------------------------
 
+
 def _read_account_transactions(account_id: int) -> str:
     """
     Read all transactions for one account from the finance database.
     NOTE: Does NOT select customer_name or other PII fields.
     """
     rows = run_query(
-        "SELECT txn_date, amount, category, description "
-        "FROM transactions WHERE account_id = ?",
+        "SELECT txn_date, amount, category, description " "FROM transactions WHERE account_id = ?",
         (account_id,),
     )
     if not rows:
         return f"No transactions found for account {account_id}."
 
-    lines = [
-        f"{row['txn_date']} | {row['category']} | {row['amount']} | {row['description']}"
-        for row in rows
-    ]
+    lines = [f"{row['txn_date']} | {row['category']} | {row['amount']} | {row['description']}" for row in rows]
     return "\n".join(lines)
 
 
@@ -63,6 +63,7 @@ def _search_market_news(query: str) -> str:
 
     try:
         from tavily import TavilyClient
+
         client = TavilyClient(api_key=api_key)
         response = client.search(query=query, max_results=3)
 
@@ -99,6 +100,7 @@ guarded_search_news = guard_tool(
 # Step 3: expose the guarded functions as LangChain tools
 # ------------------------------------------------------------------
 
+
 def get_tools():
     """Return the list of LangChain tools this agent is allowed to use."""
     return [
@@ -106,16 +108,12 @@ def get_tools():
             func=guarded_read_transactions,
             name="read_account_transactions",
             description=(
-                "Read all transactions for a given account_id (integer) "
-                "from the finance database. Read-only."
+                "Read all transactions for a given account_id (integer) " "from the finance database. Read-only."
             ),
         ),
         StructuredTool.from_function(
             func=guarded_search_news,
             name="search_market_news",
-            description=(
-                "Search recent finance/market news for a given topic "
-                "string using Tavily. Read-only."
-            ),
+            description=("Search recent finance/market news for a given topic " "string using Tavily. Read-only."),
         ),
     ]

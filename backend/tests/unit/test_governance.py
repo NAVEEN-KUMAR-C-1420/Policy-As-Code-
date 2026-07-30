@@ -14,39 +14,40 @@ Or simply:
     python test_governance.py
 """
 
-import os
-import sys
-import json
 import copy
-import tempfile
+import json
+import os
 import sqlite3
+import sys
+import tempfile
 
 # Ensure project root is in path
 from core.paths import BASE_DIR as PROJECT_ROOT
-sys.path.insert(0, PROJECT_ROOT)
 
-# Make sure the dummy database exists
-from data.init_db import main as init_db
-init_db()
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-from middleware.policy_validator import (
-    validate_policy,
-    PolicyValidationError,
-    PolicyValidationResult,
-)
+# NOTE: Database initialization is handled by conftest.py session fixture.
+# Do NOT call init_db() here — it creates import ordering issues in CI.
+
 from middleware.agent_policy_compat import (
-    validate_agent_policy_compat,
     AgentPolicyCompatError,
+    validate_agent_policy_compat,
 )
-from middleware.tool_interceptor import guard_tool, reset_call_counters
-from middleware.audit_log import write_audit_entry, read_recent_entries
+from middleware.audit_log import read_recent_entries, write_audit_entry
 from middleware.hitl import check_hitl
 from middleware.policy_loader import load_policy
-
+from middleware.policy_validator import (
+    PolicyValidationError,
+    PolicyValidationResult,
+    validate_policy,
+)
+from middleware.tool_interceptor import guard_tool, reset_call_counters
 
 # ================================================================
 # Helper: a complete valid policy for testing
 # ================================================================
+
 
 def _make_valid_policy():
     """Return a minimal but complete valid policy dictionary."""
@@ -120,6 +121,7 @@ def _make_valid_agent_config():
 # TEST 1: Valid policy passes validation
 # ================================================================
 
+
 def test_01_valid_policy_passes():
     policy = _make_valid_policy()
     result = validate_policy(policy)
@@ -130,6 +132,7 @@ def test_01_valid_policy_passes():
 # ================================================================
 # TEST 2: Policy missing approved_models fails
 # ================================================================
+
 
 def test_02_missing_approved_models():
     policy = _make_valid_policy()
@@ -144,6 +147,7 @@ def test_02_missing_approved_models():
 # TEST 3: Policy missing HITL fails
 # ================================================================
 
+
 def test_03_missing_hitl():
     policy = _make_valid_policy()
     del policy["hitl"]
@@ -157,6 +161,7 @@ def test_03_missing_hitl():
 # TEST 4: Policy missing data_retention fails
 # ================================================================
 
+
 def test_04_missing_retention():
     policy = _make_valid_policy()
     del policy["data_retention"]
@@ -169,6 +174,7 @@ def test_04_missing_retention():
 # ================================================================
 # TEST 5: Agent ID mismatch fails
 # ================================================================
+
 
 def test_05_agent_id_mismatch():
     agent = _make_valid_agent_config()
@@ -184,6 +190,7 @@ def test_05_agent_id_mismatch():
 # TEST 6: Unapproved model fails
 # ================================================================
 
+
 def test_06_unapproved_model():
     agent = _make_valid_agent_config()
     policy = _make_valid_policy()
@@ -198,6 +205,7 @@ def test_06_unapproved_model():
 # TEST 7: Agent declares tool absent from policy → fails
 # ================================================================
 
+
 def test_07_tool_not_in_policy():
     agent = _make_valid_agent_config()
     policy = _make_valid_policy()
@@ -211,6 +219,7 @@ def test_07_tool_not_in_policy():
 # ================================================================
 # TEST 8: Explicit allowed tool executes
 # ================================================================
+
 
 def test_08_allowed_tool_executes():
     reset_call_counters()
@@ -229,6 +238,7 @@ def test_08_allowed_tool_executes():
 # TEST 9: Explicit denied tool is blocked
 # ================================================================
 
+
 def test_09_denied_tool_blocked():
     reset_call_counters()
     policy = _make_valid_policy()
@@ -245,6 +255,7 @@ def test_09_denied_tool_blocked():
 # ================================================================
 # TEST 10: Unknown tool is blocked (default-DENY)
 # ================================================================
+
 
 def test_10_unknown_tool_blocked():
     reset_call_counters()
@@ -263,33 +274,35 @@ def test_10_unknown_tool_blocked():
 # TEST 11: Tool with denied scope is blocked even if allowed=true
 # ================================================================
 
+
 def test_11_denied_scope_overrides_allow():
     reset_call_counters()
     policy = _make_valid_policy()
     # Create a tool that says allowed=true but scope is in denied_scopes
-    policy["allowed_tools"].append({
-        "name": "sneaky_delete",
-        "scope": "delete",
-        "resource": "sqlite",
-        "tables": [],
-        "contains_pii": False,
-        "allowed": True,  # says allowed, but scope is denied
-    })
+    policy["allowed_tools"].append(
+        {
+            "name": "sneaky_delete",
+            "scope": "delete",
+            "resource": "sqlite",
+            "tables": [],
+            "contains_pii": False,
+            "allowed": True,  # says allowed, but scope is denied
+        }
+    )
 
     def _sneaky(x: int) -> str:
         return "THIS SHOULD NEVER RUN"
 
     guarded = guard_tool("sneaky_delete", policy, "test_agent", _sneaky)
     result = guarded(1)
-    assert "BLOCKED" in result, (
-        f"Tool with denied scope should be blocked even if allowed=true: {result}"
-    )
+    assert "BLOCKED" in result, f"Tool with denied scope should be blocked even if allowed=true: {result}"
     print("  PASS: TEST 11 - Denied scope overrides allow (defense in depth)")
 
 
 # ================================================================
 # TEST 12: Rate limit is enforced
 # ================================================================
+
 
 def test_12_rate_limit():
     reset_call_counters()
@@ -306,9 +319,7 @@ def test_12_rate_limit():
     r2 = guarded(2)
     assert "call_2" == r2
     r3 = guarded(3)
-    assert "BLOCKED" in r3 and "rate limit" in r3.lower(), (
-        f"Third call should be rate limited: {r3}"
-    )
+    assert "BLOCKED" in r3 and "rate limit" in r3.lower(), f"Third call should be rate limited: {r3}"
     print("  PASS: TEST 12 - Rate limit is enforced")
 
 
@@ -316,18 +327,21 @@ def test_12_rate_limit():
 # TEST 13: PII/table restriction is enforced
 # ================================================================
 
+
 def test_13_table_restriction():
     reset_call_counters()
     policy = _make_valid_policy()
     # Add a tool that accesses a table not in allowed_tables
-    policy["allowed_tools"].append({
-        "name": "read_accounts",
-        "scope": "read",
-        "resource": "sqlite",
-        "tables": ["accounts"],  # but allowed_tables only has "transactions"
-        "contains_pii": False,
-        "allowed": True,
-    })
+    policy["allowed_tools"].append(
+        {
+            "name": "read_accounts",
+            "scope": "read",
+            "resource": "sqlite",
+            "tables": ["accounts"],  # but allowed_tables only has "transactions"
+            "contains_pii": False,
+            "allowed": True,
+        }
+    )
 
     def _read_accts(x: int) -> str:
         return "THIS SHOULD NEVER RUN"
@@ -343,14 +357,16 @@ def test_13b_pii_restriction():
     reset_call_counters()
     policy = _make_valid_policy()
     # Add a tool that contains PII
-    policy["allowed_tools"].append({
-        "name": "read_pii_data",
-        "scope": "read",
-        "resource": "sqlite",
-        "tables": ["transactions"],
-        "contains_pii": True,  # but pii_allowed=false
-        "allowed": True,
-    })
+    policy["allowed_tools"].append(
+        {
+            "name": "read_pii_data",
+            "scope": "read",
+            "resource": "sqlite",
+            "tables": ["transactions"],
+            "contains_pii": True,  # but pii_allowed=false
+            "allowed": True,
+        }
+    )
 
     def _read_pii(x: int) -> str:
         return "THIS SHOULD NEVER RUN"
@@ -366,8 +382,10 @@ def test_13b_pii_restriction():
 # TEST 14: Risk calculation is deterministic
 # ================================================================
 
+
 def test_14_deterministic_risk():
     from agents.risk_analyzer_agent.dev.tools import _calculate_risk_score
+
     reset_call_counters()
 
     # Account 101: balance=52000, outflows= -1200 + -4500 = 5700
@@ -392,6 +410,7 @@ def test_14_deterministic_risk():
 # ================================================================
 # TEST 15: High risk triggers HITL
 # ================================================================
+
 
 def test_15_hitl_triggered():
     policy = _make_valid_policy()
@@ -418,23 +437,23 @@ def test_15_hitl_triggered():
 # TEST 16: Audit log receives governance events
 # ================================================================
 
+
 def test_16_audit_logging():
     # Write a test entry
-    write_audit_entry({
-        "agent_id": "test_agent",
-        "event_type": "TEST",
-        "decision": "TEST_ENTRY",
-        "reason": "Verifying audit log works",
-    })
+    write_audit_entry(
+        {
+            "agent_id": "test_agent",
+            "event_type": "TEST",
+            "decision": "TEST_ENTRY",
+            "reason": "Verifying audit log works",
+        }
+    )
 
     entries = read_recent_entries(10)
     assert len(entries) > 0, "Should have audit entries"
 
     # Find our test entry
-    found = any(
-        e.get("event_type") == "TEST" and e.get("decision") == "TEST_ENTRY"
-        for e in entries
-    )
+    found = any(e.get("event_type") == "TEST" and e.get("decision") == "TEST_ENTRY" for e in entries)
     assert found, "Test audit entry should be in recent entries"
 
     # Verify entries have timestamps
@@ -447,21 +466,20 @@ def test_16_audit_logging():
 # TEST 17: Actual agent policies validate
 # ================================================================
 
+
 def test_17_real_agent_policies():
     agents = [
         "data_collector_agent",
         "risk_analyzer_agent",
         "report_writer_agent",
     ]
+    from core.paths import AGENTS_DIR
+
     for agent_name in agents:
-        policy_path = os.path.join(
-            PROJECT_ROOT, "agents", agent_name, "policy.yaml"
-        )
+        policy_path = AGENTS_DIR / agent_name / "policy.yaml"
         policy = load_policy(policy_path)
         result = validate_policy(policy)
-        assert result.valid, (
-            f"Policy for {agent_name} should be valid: {result.errors}"
-        )
+        assert result.valid, f"Policy for {agent_name} should be valid: {result.errors}"
     print("  PASS: TEST 17 - All 3 real agent policies validate successfully")
 
 
@@ -469,15 +487,17 @@ def test_17_real_agent_policies():
 # TEST 18: Real agent/policy compatibility
 # ================================================================
 
+
 def test_18_real_agent_compat():
     import yaml
+
     agents = [
         "data_collector_agent",
         "risk_analyzer_agent",
         "report_writer_agent",
     ]
     for agent_name in agents:
-        agent_dir = os.path.join(PROJECT_ROOT, "agents", agent_name)
+        agent_dir = PROJECT_ROOT / "agents" / agent_name
         agent_yaml = agent_dir / "agent.yaml"
         policy_yaml = agent_dir / "policy.yaml"
 
@@ -486,9 +506,7 @@ def test_18_real_agent_compat():
         policy = load_policy(policy_yaml)
 
         result = validate_agent_policy_compat(agent_config, policy)
-        assert result.valid, (
-            f"Agent/policy compat for {agent_name} should pass: {result.errors}"
-        )
+        assert result.valid, f"Agent/policy compat for {agent_name} should pass: {result.errors}"
     print("  PASS: TEST 18 - All 3 real agents are compatible with their policies")
 
 
@@ -496,9 +514,11 @@ def test_18_real_agent_compat():
 # TEST 19: Delete old reports is blocked (defense in depth)
 # ================================================================
 
+
 def test_19_delete_blocked():
     reset_call_counters()
     from agents.report_writer_agent.dev.tools import guarded_delete_old_reports
+
     result = guarded_delete_old_reports(account_id=101)
     assert "BLOCKED" in result, f"delete_old_reports should be BLOCKED: {result}"
     print("  PASS: TEST 19 - delete_old_reports is blocked (defense in depth)")
@@ -507,6 +527,7 @@ def test_19_delete_blocked():
 # ================================================================
 # TEST 20: Policy validator catches HITL threshold out of range
 # ================================================================
+
 
 def test_20_hitl_threshold_range():
     policy = _make_valid_policy()
@@ -521,6 +542,7 @@ def test_20_hitl_threshold_range():
 # TEST 21: Negative retention days rejected
 # ================================================================
 
+
 def test_21_negative_retention():
     policy = _make_valid_policy()
     policy["data_retention"]["reports_days"] = -10
@@ -534,13 +556,15 @@ def test_21_negative_retention():
 # TEST 22: Data retention functions work
 # ================================================================
 
+
 def test_22_data_retention():
-    from middleware.data_retention import find_expired_reports
     from common.db import PROVIDER
+    from middleware.data_retention import find_expired_reports
+
     if PROVIDER == "supabase":
         print("  SKIP: TEST 22 - Data retention functions (SQLite only)")
         return
-        
+
     db_path = PROJECT_ROOT / "data" / "finance.db"
     # With retention of 9999 days, nothing should be expired
     expired = find_expired_reports(db_path, retention_days=9999)
@@ -551,6 +575,7 @@ def test_22_data_retention():
 # ================================================================
 # TEST 23: Missing regulatory_frameworks fails
 # ================================================================
+
 
 def test_23_missing_regulatory():
     policy = _make_valid_policy()
@@ -565,12 +590,14 @@ def test_23_missing_regulatory():
 # TEST 24: Database integrity
 # ================================================================
 
+
 def test_24_db_integrity():
     from common.db import PROVIDER
+
     if PROVIDER == "supabase":
         print("  SKIP: TEST 24 - Database integrity verified (SQLite only)")
         return
-        
+
     db_path = PROJECT_ROOT / "data" / "finance.db"
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -593,5 +620,3 @@ def test_24_db_integrity():
 
     conn.close()
     print("  PASS: TEST 24 - Database integrity verified")
-
-

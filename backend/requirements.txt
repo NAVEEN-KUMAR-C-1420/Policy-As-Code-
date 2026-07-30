@@ -1,36 +1,55 @@
+# ===========================
 # Core LangChain
-langchain
-langchain-core
-langchain-community
-# LLM providers (you only need the one you actually use,
-# but installing all of them lets you switch freely)
-langchain-groq
-langchain-openai
-langchain-anthropic
-langchain-tavily
+# ===========================
+langchain==1.3.14
+langchain-core==1.5.3
+langchain-community==0.4.2
 
-# Web search tool used by the Data Collector Agent
-tavily-python
+# ===========================
+# LLM Providers
+# ===========================
+langchain-groq==1.1.3
+langchain-openai==1.4.1
+langchain-anthropic==1.5.3
+langchain-tavily==0.2.18
 
-# Optional: LangSmith tracing / observability
-langsmith
+# ===========================
+# Web Search
+# ===========================
+tavily-python==0.7.27
 
-# Config + environment
-pyyaml
-python-dotenv
-pydantic
-pytest
+# ===========================
+# Observability (optional)
+# ===========================
+langsmith==0.3.45
 
-# FastAPI API Layer
-fastapi
-uvicorn
+# ===========================
+# Config + Environment
+# ===========================
+pyyaml==6.0.3
+python-dotenv==1.2.2
+pydantic==2.13.4
 
+# ===========================
+# FastAPI
+# ===========================
+fastapi==0.141.1
+uvicorn==0.52.0
+
+# ===========================
 # Testing
-pytest
-httpx
+# ===========================
+pytest==9.1.1
+httpx==0.28.1
 
-# Supabase / PostgreSQL
-psycopg2-binary
-supabase
+# ===========================
+# Database
+# ===========================
+psycopg2-binary==2.9.12
+supabase==2.31.0
 
-
+# ===========================
+# Dev / CI Tools
+# ===========================
+ruff==0.16.0
+black==26.5.1

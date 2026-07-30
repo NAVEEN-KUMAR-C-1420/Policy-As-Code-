@@ -74,69 +74,72 @@ def guard_tool(tool_name: str, policy: dict, agent_id: str, original_function):
 
         # ---- Check 1: is this tool known at all? (default-DENY) ----
         if rule is None:
-            write_audit_entry({
-                "agent_id": agent_id,
-                "event_type": "TOOL_CALL",
-                "tool_name": tool_name,
-                "scope": "unknown",
-                "args": safe_args,
-                "kwargs": safe_kwargs,
-                "decision": "DENIED",
-                "reason": "Tool not found in policy (default: DENY)",
-            })
-            
-            from common.repositories import ToolExecutionRepository
-            ToolExecutionRepository.save({
-                "conversation_id": "system_generated",
-                "tool_name": tool_name,
-                "allowed": False,
-                "blocked": True,
-                "reason": "Tool not found in policy (default: DENY)",
-                "risk_score": 0.0,
-                "policy_version": "unknown",
-                "duration": 0.0
-            })
-            
-            return (
-                f"BLOCKED BY POLICY: agent '{agent_id}' is not allowed "
-                f"to use tool '{tool_name}' (unknown tool)."
+            write_audit_entry(
+                {
+                    "agent_id": agent_id,
+                    "event_type": "TOOL_CALL",
+                    "tool_name": tool_name,
+                    "scope": "unknown",
+                    "args": safe_args,
+                    "kwargs": safe_kwargs,
+                    "decision": "DENIED",
+                    "reason": "Tool not found in policy (default: DENY)",
+                }
             )
+
+            from common.repositories import ToolExecutionRepository
+
+            ToolExecutionRepository.save(
+                {
+                    "conversation_id": "system_generated",
+                    "tool_name": tool_name,
+                    "allowed": False,
+                    "blocked": True,
+                    "reason": "Tool not found in policy (default: DENY)",
+                    "risk_score": 0.0,
+                    "policy_version": "unknown",
+                    "duration": 0.0,
+                }
+            )
+
+            return f"BLOCKED BY POLICY: agent '{agent_id}' is not allowed " f"to use tool '{tool_name}' (unknown tool)."
 
         tool_scope = rule.get("scope", "")
 
         # ---- Check 2: is the tool explicitly disallowed? ----
         if rule.get("allowed") is not True:
-            write_audit_entry({
-                "agent_id": agent_id,
-                "event_type": "TOOL_CALL",
-                "tool_name": tool_name,
-                "scope": tool_scope,
-                "args": safe_args,
-                "kwargs": safe_kwargs,
-                "decision": "DENIED",
-                "reason": "Tool is set to allowed=false in policy",
-            })
-            return (
-                f"BLOCKED BY POLICY: agent '{agent_id}' is not allowed "
-                f"to use tool '{tool_name}'."
+            write_audit_entry(
+                {
+                    "agent_id": agent_id,
+                    "event_type": "TOOL_CALL",
+                    "tool_name": tool_name,
+                    "scope": tool_scope,
+                    "args": safe_args,
+                    "kwargs": safe_kwargs,
+                    "decision": "DENIED",
+                    "reason": "Tool is set to allowed=false in policy",
+                }
             )
+            return f"BLOCKED BY POLICY: agent '{agent_id}' is not allowed " f"to use tool '{tool_name}'."
 
         # ---- Check 3: is the tool's scope in denied_scopes? ----
         # Deny rules take precedence over allow rules
         if tool_scope in denied_scopes:
-            write_audit_entry({
-                "agent_id": agent_id,
-                "event_type": "TOOL_CALL",
-                "tool_name": tool_name,
-                "scope": tool_scope,
-                "args": safe_args,
-                "kwargs": safe_kwargs,
-                "decision": "DENIED",
-                "reason": (
-                    f"Tool scope '{tool_scope}' is in denied_scopes "
-                    f"{denied_scopes} (deny takes precedence over allow)"
-                ),
-            })
+            write_audit_entry(
+                {
+                    "agent_id": agent_id,
+                    "event_type": "TOOL_CALL",
+                    "tool_name": tool_name,
+                    "scope": tool_scope,
+                    "args": safe_args,
+                    "kwargs": safe_kwargs,
+                    "decision": "DENIED",
+                    "reason": (
+                        f"Tool scope '{tool_scope}' is in denied_scopes "
+                        f"{denied_scopes} (deny takes precedence over allow)"
+                    ),
+                }
+            )
             return (
                 f"BLOCKED BY POLICY: agent '{agent_id}' cannot use "
                 f"tool '{tool_name}' because scope '{tool_scope}' is denied."
@@ -152,19 +155,20 @@ def guard_tool(tool_name: str, policy: dict, agent_id: str, original_function):
         if allowed_tables is not None and tool_tables:
             for table in tool_tables:
                 if table not in allowed_tables:
-                    write_audit_entry({
-                        "agent_id": agent_id,
-                        "event_type": "TOOL_CALL",
-                        "tool_name": tool_name,
-                        "scope": tool_scope,
-                        "args": safe_args,
-                        "kwargs": safe_kwargs,
-                        "decision": "DENIED",
-                        "reason": (
-                            f"Tool accesses table '{table}' which is not "
-                            f"in allowed_tables {allowed_tables}"
-                        ),
-                    })
+                    write_audit_entry(
+                        {
+                            "agent_id": agent_id,
+                            "event_type": "TOOL_CALL",
+                            "tool_name": tool_name,
+                            "scope": tool_scope,
+                            "args": safe_args,
+                            "kwargs": safe_kwargs,
+                            "decision": "DENIED",
+                            "reason": (
+                                f"Tool accesses table '{table}' which is not " f"in allowed_tables {allowed_tables}"
+                            ),
+                        }
+                    )
                     return (
                         f"BLOCKED BY POLICY: agent '{agent_id}' cannot use "
                         f"tool '{tool_name}' (table '{table}' not allowed)."
@@ -172,69 +176,75 @@ def guard_tool(tool_name: str, policy: dict, agent_id: str, original_function):
 
         # Check PII access
         if not pii_allowed and rule.get("contains_pii", False):
-            write_audit_entry({
-                "agent_id": agent_id,
-                "event_type": "TOOL_CALL",
-                "tool_name": tool_name,
-                "scope": tool_scope,
-                "args": safe_args,
-                "kwargs": safe_kwargs,
-                "decision": "DENIED",
-                "reason": "Tool contains PII but pii_allowed=false",
-            })
+            write_audit_entry(
+                {
+                    "agent_id": agent_id,
+                    "event_type": "TOOL_CALL",
+                    "tool_name": tool_name,
+                    "scope": tool_scope,
+                    "args": safe_args,
+                    "kwargs": safe_kwargs,
+                    "decision": "DENIED",
+                    "reason": "Tool contains PII but pii_allowed=false",
+                }
+            )
             return (
-                f"BLOCKED BY POLICY: agent '{agent_id}' cannot use "
-                f"tool '{tool_name}' (PII access not permitted)."
+                f"BLOCKED BY POLICY: agent '{agent_id}' cannot use " f"tool '{tool_name}' (PII access not permitted)."
             )
 
         # ---- Check 5: rate limit ----
         _call_counters[counter_key] = _call_counters.get(counter_key, 0) + 1
         max_calls = policy.get("rate_limits", {}).get("max_calls_per_tool", 999)
         if _call_counters[counter_key] > max_calls:
-            write_audit_entry({
+            write_audit_entry(
+                {
+                    "agent_id": agent_id,
+                    "event_type": "TOOL_CALL",
+                    "tool_name": tool_name,
+                    "scope": tool_scope,
+                    "args": safe_args,
+                    "kwargs": safe_kwargs,
+                    "decision": "RATE_LIMITED",
+                    "reason": f"Rate limit exceeded (max {max_calls} calls)",
+                }
+            )
+            return f"BLOCKED BY POLICY: rate limit exceeded for " f"tool '{tool_name}' (max {max_calls})."
+
+        # ---- ALL checks passed - run the real tool ----
+        import time
+
+        start_time = time.time()
+        result = original_function(*args, **kwargs)
+        duration = time.time() - start_time
+
+        output_preview = str(result)[:500] if log_outputs else "[redacted]"
+        write_audit_entry(
+            {
                 "agent_id": agent_id,
                 "event_type": "TOOL_CALL",
                 "tool_name": tool_name,
                 "scope": tool_scope,
                 "args": safe_args,
                 "kwargs": safe_kwargs,
-                "decision": "RATE_LIMITED",
-                "reason": f"Rate limit exceeded (max {max_calls} calls)",
-            })
-            return (
-                f"BLOCKED BY POLICY: rate limit exceeded for "
-                f"tool '{tool_name}' (max {max_calls})."
-            )
-
-        # ---- ALL checks passed - run the real tool ----
-        import time
-        start_time = time.time()
-        result = original_function(*args, **kwargs)
-        duration = time.time() - start_time
-
-        output_preview = str(result)[:500] if log_outputs else "[redacted]"
-        write_audit_entry({
-            "agent_id": agent_id,
-            "event_type": "TOOL_CALL",
-            "tool_name": tool_name,
-            "scope": tool_scope,
-            "args": safe_args,
-            "kwargs": safe_kwargs,
-            "output_preview": output_preview,
-            "decision": "ALLOWED",
-        })
+                "output_preview": output_preview,
+                "decision": "ALLOWED",
+            }
+        )
 
         from common.repositories import ToolExecutionRepository
-        ToolExecutionRepository.save({
-            "conversation_id": "system_generated",
-            "tool_name": tool_name,
-            "allowed": True,
-            "blocked": False,
-            "reason": "Policy rules passed",
-            "risk_score": 0.0,
-            "policy_version": "unknown",
-            "duration": duration
-        })
+
+        ToolExecutionRepository.save(
+            {
+                "conversation_id": "system_generated",
+                "tool_name": tool_name,
+                "allowed": True,
+                "blocked": False,
+                "reason": "Policy rules passed",
+                "risk_score": 0.0,
+                "policy_version": "unknown",
+                "duration": duration,
+            }
+        )
 
         return result
 

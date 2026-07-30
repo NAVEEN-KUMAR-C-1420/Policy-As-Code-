@@ -1,0 +1,36 @@
+agent_id: master_agent
+allowed_tools:
+- allowed: true
+  contains_pii: false
+  name: run_subagent_pipeline
+  resource: subagents
+  scope: execute
+  tables: []
+approved_models:
+- openai/gpt-4o-mini
+audit:
+  enabled: true
+  log_denied_actions: true
+  log_inputs: true
+  log_outputs: true
+data_access:
+  allowed_tables: []
+  pii_allowed: false
+data_retention:
+  audit_logs_days: 365
+  reports_days: 90
+denied_scopes:
+- delete
+guardrails:
+  harmful_content_filter: true
+  pii_protection: true
+  prompt_injection_protection: true
+hitl:
+  enabled: false
+  high_risk_requires_approval: false
+  risk_threshold: 0.7
+policy_version: '1.0'
+rate_limits:
+  max_calls_per_tool: 5
+regulatory_frameworks:
+- internal-financial-governance

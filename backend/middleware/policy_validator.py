@@ -20,16 +20,15 @@ Usage:
 
 class PolicyValidationError(Exception):
     """Raised when a policy fails validation."""
+
     def __init__(self, errors: list):
         self.errors = errors
-        super().__init__(
-            "Policy validation failed:\n" +
-            "\n".join(f"  - {e}" for e in errors)
-        )
+        super().__init__("Policy validation failed:\n" + "\n".join(f"  - {e}" for e in errors))
 
 
 class PolicyValidationResult:
     """Holds the result of a policy validation."""
+
     def __init__(self, valid: bool, errors: list):
         self.valid = valid
         self.errors = errors
@@ -37,10 +36,7 @@ class PolicyValidationResult:
     def __repr__(self):
         if self.valid:
             return "PolicyValidationResult(valid=True)"
-        return (
-            f"PolicyValidationResult(valid=False, "
-            f"errors={self.errors})"
-        )
+        return f"PolicyValidationResult(valid=False, " f"errors={self.errors})"
 
 
 def validate_policy(policy: dict, raise_on_error: bool = False) -> PolicyValidationResult:
@@ -119,9 +115,7 @@ def validate_policy(policy: dict, raise_on_error: bool = False) -> PolicyValidat
                 if not isinstance(threshold, (int, float)):
                     errors.append("'hitl.risk_threshold' must be a number")
                 elif not (0.0 <= threshold <= 1.0):
-                    errors.append(
-                        f"'hitl.risk_threshold' must be between 0.0 and 1.0, got {threshold}"
-                    )
+                    errors.append(f"'hitl.risk_threshold' must be between 0.0 and 1.0, got {threshold}")
 
     # ---- data_retention ----
     if "data_retention" not in policy:
@@ -135,9 +129,7 @@ def validate_policy(policy: dict, raise_on_error: bool = False) -> PolicyValidat
                 if key in retention:
                     val = retention[key]
                     if not isinstance(val, (int, float)) or val < 0:
-                        errors.append(
-                            f"'data_retention.{key}' must be a non-negative number, got {val}"
-                        )
+                        errors.append(f"'data_retention.{key}' must be a non-negative number, got {val}")
 
     # ---- regulatory_frameworks ----
     if "regulatory_frameworks" not in policy:
@@ -160,9 +152,7 @@ def validate_policy(policy: dict, raise_on_error: bool = False) -> PolicyValidat
             if "max_calls_per_tool" in rl:
                 val = rl["max_calls_per_tool"]
                 if not isinstance(val, int) or val <= 0:
-                    errors.append(
-                        f"'rate_limits.max_calls_per_tool' must be a positive integer, got {val}"
-                    )
+                    errors.append(f"'rate_limits.max_calls_per_tool' must be a positive integer, got {val}")
 
     # ---- audit (optional but validated if present) ----
     if "audit" in policy:

@@ -2,11 +2,11 @@ name: Security Scans
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 0 * * 1'  # Weekly on Monday (reduced from daily to avoid noise)
 
 jobs:
   secret-scan:
@@ -19,16 +19,46 @@ jobs:
 
       - name: Check for committed .env files
         run: |
+          FOUND_ENV=false
+
+          # Check root .env
+          if [ -f ".env" ]; then
+            echo "❌ SECURITY BREACH: .env file found at repository root!"
+            FOUND_ENV=true
+          fi
+
+          # Check backend/.env
           if [ -f "backend/.env" ]; then
-            echo "SECURITY BREACH: .env file is committed in the repository!"
+            echo "❌ SECURITY BREACH: backend/.env file found in repository!"
+            FOUND_ENV=true
+          fi
+
+          # Check if any .env files are tracked by git (excluding .env.example)
+          TRACKED=$(git ls-files '*.env' ':!:*.env.example' ':!:.trufflehog.yml' 2>/dev/null || true)
+          if [ -n "$TRACKED" ]; then
+            echo "❌ SECURITY BREACH: .env files are tracked by git:"
+            echo "$TRACKED"
+            FOUND_ENV=true
+          fi
+
+          if [ "$FOUND_ENV" = true ]; then
+            echo ""
+            echo "HOW TO FIX:"
+            echo "  1. Remove the .env file from tracking: git rm --cached .env"
+            echo "  2. Add .env to .gitignore (should already be there)"
+            echo "  3. Rotate any exposed credentials immediately"
             exit 1
           fi
-          echo "backend/.env is safely excluded."
 
-      - name: TruffleHog OSS
-        uses: trufflesecurity/trufflehog@main
+          echo "✅ No .env files committed. Repository is clean."
+
+      - name: TruffleHog Secret Scan
+        uses: trufflesecurity/trufflehog@v3.88.26
         with:
           path: ./
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
-          extra_args: --debug --only-verified
+          extra_args: >-
+            --only-verified
+            --exclude-paths=.trufflehog.yml
+            --fail

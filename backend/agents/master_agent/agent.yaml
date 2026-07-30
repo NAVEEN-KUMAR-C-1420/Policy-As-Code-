@@ -1,0 +1,21 @@
+agent_id: master_agent
+name: "Master Router Agent"
+description: >
+  Acts as the primary interface for users. Evaluates raw prompts and routes
+  them to appropriate subagents (Data Collector, Risk Analyzer, Report Writer).
+
+model: "openai/gpt-4o-mini"
+temperature: 0.1
+max_tokens: 2048
+
+tools:
+  - run_subagent_pipeline
+
+input:
+  - raw_prompt
+  - account_id
+
+output:
+  - chat_response
+
+next_agent: null

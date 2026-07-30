@@ -19,11 +19,11 @@ jobs:
 
       - name: Check for committed .env files
         run: |
-          if [ -f ".env" ]; then
+          if [ -f "backend/.env" ]; then
             echo "SECURITY BREACH: .env file is committed in the repository!"
             exit 1
           fi
-          echo ".env is safely excluded."
+          echo "backend/.env is safely excluded."
 
       - name: TruffleHog OSS
         uses: trufflesecurity/trufflehog@main

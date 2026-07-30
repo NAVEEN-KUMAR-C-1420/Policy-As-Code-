@@ -1,0 +1,42 @@
+# =============================================================
+# Policy: Report Writer Agent
+# =============================================================
+# This file shows all 3 outcomes the interceptor can produce:
+#   - save_report_to_db  -> allowed: true   (ALLOWED at runtime)
+#   - write_report_file  -> allowed: true   (ALLOWED at runtime)
+#   - delete_old_reports -> allowed: false  (BLOCKED at runtime)
+# =============================================================
+
+agent_id: report_writer_agent
+version: "1.0"
+
+allowed_tools:
+  - name: save_report_to_db
+    scope: write
+    resource: "sqlite:finance.db:reports"
+    allowed_tables: [reports]
+    allowed: true
+
+  - name: write_report_file
+    scope: write
+    resource: "filesystem:reports/"
+    allowed: true
+
+  - name: delete_old_reports
+    scope: delete
+    resource: "sqlite:finance.db:reports"
+    allowed: false   # explicitly blocked - this agent may never delete data
+
+denied_scopes:
+  - delete
+
+rate_limits:
+  max_calls_per_tool: 5
+
+data_access:
+  pii_allowed: false
+  tables_allowed: [reports]   # this agent may only ever write to "reports"
+
+audit:
+  log_inputs: true
+  log_outputs: true

@@ -1,0 +1,37 @@
+# =============================================================
+# Agent Config: Data Collector Agent
+# =============================================================
+# Position in pipeline: STEP 1 (runs first)
+# Purpose: read raw transactions + relevant market news.
+# This agent is READ-ONLY - see policy.yaml for enforced rules.
+# =============================================================
+
+agent_id: data_collector_agent
+name: "Data Collector Agent"
+description: >
+  Reads raw account transactions from the finance database and
+  fetches recent market news using Tavily search. Never writes
+  or deletes any data.
+
+# LLM settings - "provider" is optional. If left blank, the agent
+# uses whatever is set as active_provider in config/providers.yaml.
+provider: groq
+model: "openai/gpt-oss-120b"
+temperature: 0.2
+max_tokens: 1024
+
+# Tools this agent is allowed to be given (must also be marked
+# allowed: true in policy.yaml, or they will be blocked at runtime)
+tools:
+  - read_account_transactions
+  - search_market_news
+
+input:
+  - account_id
+
+output:
+  - transactions_summary
+  - market_news_summary
+
+# Which agent runs next in the sequential pipeline
+next_agent: risk_analyzer_agent

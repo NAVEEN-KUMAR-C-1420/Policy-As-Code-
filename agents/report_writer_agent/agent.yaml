@@ -1,0 +1,37 @@
+# =============================================================
+# Agent Config: Report Writer Agent
+# =============================================================
+# Position in pipeline: STEP 3 (runs last)
+# Purpose: write the final report to the database and to a file.
+# This agent can WRITE, but is NOT allowed to delete anything -
+# see policy.yaml, which explicitly blocks its delete_old_reports tool.
+# =============================================================
+
+agent_id: report_writer_agent
+name: "Report Writer Agent"
+description: >
+  Writes a short financial report combining the collected data and
+  risk analysis, then saves it to the database and to a report file.
+
+provider: groq
+model: "openai/gpt-oss-120b"
+temperature: 0.3
+max_tokens: 1024
+
+# NOTE: delete_old_reports exists in tools.py for demonstration
+# purposes but is deliberately left OUT of this list and marked
+# allowed: false in policy.yaml, so it is never given to the LLM
+# and would be blocked even if it were.
+tools:
+  - save_report_to_db
+  - write_report_file
+
+input:
+  - account_id
+  - transactions_summary
+  - risk_report
+
+output:
+  - final_report
+
+next_agent: null   # last agent in the sequential pipeline

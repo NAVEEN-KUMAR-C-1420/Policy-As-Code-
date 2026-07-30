@@ -1,0 +1,36 @@
+# =============================================================
+# Policy: Data Collector Agent
+# =============================================================
+# This file is READ and ENFORCED at runtime by
+# middleware/tool_interceptor.py - it is not just documentation.
+# =============================================================
+
+agent_id: data_collector_agent
+version: "1.0"
+
+allowed_tools:
+  - name: read_account_transactions
+    scope: read
+    resource: "sqlite:finance.db:transactions"
+    allowed_tables: [transactions, accounts]
+    allowed: true
+
+  - name: search_market_news
+    scope: read
+    resource: "web:tavily"
+    allowed: true
+
+# Scopes this agent must never be granted, even by mistake
+denied_scopes:
+  - write
+  - delete
+
+rate_limits:
+  max_calls_per_tool: 5
+
+data_access:
+  pii_allowed: false
+
+audit:
+  log_inputs: true
+  log_outputs: true

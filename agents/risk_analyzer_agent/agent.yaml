@@ -1,0 +1,31 @@
+# =============================================================
+# Agent Config: Risk Analyzer Agent
+# =============================================================
+# Position in pipeline: STEP 2 (runs after Data Collector Agent)
+# Purpose: read account summary + calculate a risk score.
+# This agent can READ and COMPUTE, but never write or delete.
+# =============================================================
+
+agent_id: risk_analyzer_agent
+name: "Risk Analyzer Agent"
+description: >
+  Reads the account's balance/type from the database and computes
+  a simple risk score from balance and spending. Never writes data.
+
+provider: groq
+model: "openai/gpt-oss-120b"
+temperature: 0.2
+max_tokens: 1024
+
+tools:
+  - read_account_summary
+  - calculate_risk_score
+
+input:
+  - account_id
+  - transactions_summary   # output from data_collector_agent
+
+output:
+  - risk_report
+
+next_agent: report_writer_agent

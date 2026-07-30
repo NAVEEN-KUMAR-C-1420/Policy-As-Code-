@@ -1,0 +1,32 @@
+# =============================================================
+# LLM Provider Configuration
+# =============================================================
+# This is the ONLY file you need to edit to switch LLM providers
+# for every agent in the project.
+#
+# How it works:
+#   1. Set "active_provider" below to one of the keys under "providers".
+#   2. Make sure the matching API key is set in your .env file.
+#   3. That's it - no agent code needs to change.
+# =============================================================
+
+active_provider: groq
+
+providers:
+  groq:
+    class_name: ChatGroq
+    # llama-3.3-70b-versatile is being retired by Groq (Aug 2026).
+    # openai/gpt-oss-120b is the recommended current replacement.
+    # Check https://console.groq.com/docs/models for the latest list.
+    default_model: "openai/gpt-oss-120b"
+    api_key_env: GROQ_API_KEY
+
+  openai:
+    class_name: ChatOpenAI
+    default_model: "gpt-4o-mini"
+    api_key_env: OPENAI_API_KEY
+
+  anthropic:
+    class_name: ChatAnthropic
+    default_model: "claude-3-5-sonnet-20241022"
+    api_key_env: ANTHROPIC_API_KEY

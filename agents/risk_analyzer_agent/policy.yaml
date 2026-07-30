@@ -1,0 +1,32 @@
+# =============================================================
+# Policy: Risk Analyzer Agent
+# =============================================================
+
+agent_id: risk_analyzer_agent
+version: "1.0"
+
+allowed_tools:
+  - name: read_account_summary
+    scope: read
+    resource: "sqlite:finance.db:accounts"
+    allowed_tables: [accounts]
+    allowed: true
+
+  - name: calculate_risk_score
+    scope: compute
+    resource: "local:python"
+    allowed: true
+
+denied_scopes:
+  - write
+  - delete
+
+rate_limits:
+  max_calls_per_tool: 5
+
+data_access:
+  pii_allowed: false
+
+audit:
+  log_inputs: true
+  log_outputs: true

@@ -1,0 +1,19 @@
+# Core LangChain
+langchain
+langchain-core
+
+# LLM providers (you only need the one you actually use,
+# but installing all of them lets you switch freely)
+langchain-groq
+langchain-openai
+langchain-anthropic
+
+# Web search tool used by the Data Collector Agent
+tavily-python
+
+# Optional: LangSmith tracing / observability
+langsmith
+
+# Config + environment
+pyyaml
+python-dotenv

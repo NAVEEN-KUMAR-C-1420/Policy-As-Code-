@@ -8,6 +8,7 @@ allowed_tools:
   tables: []
 approved_models:
 - openai/gpt-4o-mini
+- openai/gpt-oss-120b
 audit:
   enabled: true
   log_denied_actions: true
@@ -26,8 +27,9 @@ guardrails:
   pii_protection: true
   prompt_injection_protection: true
 hitl:
-  enabled: false
+  enabled: true
   high_risk_requires_approval: false
+  requires_human_approval: true
   risk_threshold: 0.7
 policy_version: '1.0'
 rate_limits:

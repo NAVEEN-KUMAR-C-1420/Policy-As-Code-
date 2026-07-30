@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Server, Database, Lock, ShieldCheck, RefreshCw, CheckCircle2, Cpu, HelpCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Activity, Server, Database, Lock, ShieldCheck, RefreshCw, CheckCircle2, Cpu, HelpCircle, XCircle, AlertTriangle, History, ShieldAlert, FileText } from 'lucide-react';
 import { SystemAPI } from '../services/api';
 
 export default function Health() {
@@ -84,6 +84,8 @@ export default function Health() {
       case 'Database': return Database;
       case 'Activity': return Activity;
       case 'History': return History;
+      case 'ShieldAlert': return ShieldAlert;
+      case 'FileText': return FileText;
       default: return Activity;
     }
   };

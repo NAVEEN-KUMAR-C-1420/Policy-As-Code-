@@ -111,4 +111,9 @@ export const DemoAPI = {
   resetDemo: () => api.post('/demo/reset'),
 };
 
+export const HitlAPI = {
+  approve: (requestId) => api.post(`/hitl/approve/${requestId}`),
+  reject: (requestId) => api.post(`/hitl/reject/${requestId}`),
+};
+
 export default api;

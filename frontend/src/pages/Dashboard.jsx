@@ -6,7 +6,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 
-import { SystemAPI, PipelineAPI, AuditAPI, ReportsAPI, DemoAPI } from '../services/api';
+import { SystemAPI, PipelineAPI, AuditAPI, ReportsAPI, DemoAPI, HitlAPI } from '../services/api';
 import ExecutionTimeline from '../components/ExecutionTimeline';
 import ArchitectureGraph from '../components/ArchitectureGraph';
 import PresidioBadge from '../components/PresidioBadge';
@@ -32,6 +32,10 @@ export default function Dashboard({ integrity, onRefreshIntegrity }) {
   const [auditFilter, setAuditFilter] = useState('ALL');
   const [auditSearch, setAuditSearch] = useState('');
   const [expandedLogId, setExpandedLogId] = useState(null);
+
+  // HITL state
+  const [showHitlModal, setShowHitlModal] = useState(false);
+  const [hitlPayload, setHitlPayload] = useState(null);
 
   // Metrics & Reports state
   const [reportsList, setReportsList] = useState([]);
@@ -84,15 +88,21 @@ export default function Dashboard({ integrity, onRefreshIntegrity }) {
 
   const [abortController, setAbortController] = useState(null);
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = (e, defaultPrompt = null) => {
     if (e) e.preventDefault();
-    if (!inputPrompt.trim() && !selectedAccount) return;
+    
+    const userText = defaultPrompt || inputPrompt;
+    if (!userText.trim()) return;
 
-    const userText = inputPrompt || `Run analysis for Account ${selectedAccount}`;
+    if (userText.toLowerCase().trim() === 'exit') {
+      clearChat();
+      setInputPrompt('');
+      return;
+    }
+
     const newMsg = {
       sender: 'user',
       text: userText,
-      account_id: selectedAccount,
       timestamp: new Date().toLocaleTimeString(),
     };
 
@@ -107,7 +117,7 @@ export default function Dashboard({ integrity, onRefreshIntegrity }) {
     setActiveArchNode('user');
 
     PipelineAPI.stream(
-      selectedAccount, 
+      0, 
       userText,
       (data) => {
         if (data.type === 'stage') {
@@ -138,6 +148,11 @@ export default function Dashboard({ integrity, onRefreshIntegrity }) {
                 fetchAuditLogs();
                 fetchReports();
                 if (onRefreshIntegrity) onRefreshIntegrity();
+            }
+
+            if (data.status === 'approval_required') {
+              setHitlPayload(payload);
+              setShowHitlModal(true);
             }
 
             return {
@@ -238,7 +253,7 @@ export default function Dashboard({ integrity, onRefreshIntegrity }) {
 
         <div className="flex flex-wrap items-center gap-3">
           <button
-            onClick={() => handleSendMessage()}
+            onClick={(e) => handleSendMessage(e, 'Analyze account 101 and generate a risk report.')}
             disabled={isExecuting || (integrity && integrity.safe_mode)}
             className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 disabled:opacity-50"
           >
@@ -283,23 +298,7 @@ export default function Dashboard({ integrity, onRefreshIntegrity }) {
               </button>
             </div>
 
-            {/* Account Selector & Presets */}
-            <div className="p-3 bg-slate-950/60 border-b border-slate-800/80 flex items-center gap-2 text-xs">
-              <span className="text-slate-400 font-mono">ACCOUNT:</span>
-              {[101, 102, 103].map((accId) => (
-                <button
-                  key={accId}
-                  onClick={() => setSelectedAccount(accId)}
-                  className={`px-3 py-1 rounded-lg font-mono font-bold transition-all ${
-                    selectedAccount === accId
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                  }`}
-                >
-                  Account #{accId}
-                </button>
-              ))}
-            </div>
+            {/* Account Selector & Presets Removed */}
 
             {/* Chat Messages Scroll Window */}
             <div className="flex-1 p-4 overflow-y-auto space-y-4">
@@ -609,8 +608,77 @@ export default function Dashboard({ integrity, onRefreshIntegrity }) {
           </div>
 
         </div>
-
       </div>
+
+      {/* HITL Approval Modal */}
+      <AnimatePresence>
+        {showHitlModal && hitlPayload && (
+          <motion.div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl relative overflow-hidden"
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+            >
+              <div className="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>
+              
+              <div className="flex items-center gap-3 mb-4 text-amber-400">
+                <ShieldAlert className="w-8 h-8" />
+                <h3 className="text-xl font-bold text-white">Human Approval Required</h3>
+              </div>
+              
+              <p className="text-sm text-slate-300 mb-6">
+                The governance engine has paused execution because a high-risk policy threshold was triggered.
+              </p>
+              
+              <div className="bg-slate-950 rounded-xl p-4 mb-6 border border-slate-800 space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Policy ID</span>
+                  <span className="font-mono text-slate-300">v{hitlPayload.policy_id || "1.0"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Risk Score</span>
+                  <span className="font-mono text-rose-400 font-bold">{hitlPayload.risk_score?.toFixed(2) || "1.00"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Reason</span>
+                  <span className="text-amber-400 text-right w-2/3">{hitlPayload.reason || "High risk keyword detected"}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  className="flex-1 px-4 py-2.5 rounded-xl font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700"
+                  onClick={() => {
+                    HitlAPI.reject(hitlPayload.request_id).then(() => {
+                      setShowHitlModal(false);
+                      setHitlPayload(null);
+                    });
+                  }}
+                >
+                  Reject & Abort
+                </button>
+                <button
+                  className="flex-1 px-4 py-2.5 rounded-xl font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors border border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                  onClick={() => {
+                    HitlAPI.approve(hitlPayload.request_id).then(() => {
+                      setShowHitlModal(false);
+                      setHitlPayload(null);
+                    });
+                  }}
+                >
+                  Approve Execution
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

@@ -21,6 +21,7 @@ from api.routers import (
     diagnostics,
     drift,
     global_versions,
+    hitl,
     integrity,
     pipeline,
     policies,
@@ -105,6 +106,7 @@ app.include_router(demo.router)
 app.include_router(integrity.router)
 app.include_router(architecture.router)
 app.include_router(diagnostics.router)
+app.include_router(hitl.router)
 
 if __name__ == "__main__":
     import uvicorn

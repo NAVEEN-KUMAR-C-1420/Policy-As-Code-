@@ -17,7 +17,7 @@ def run_pipeline(request: PipelineRunRequest):
     )
 
 @router.get("/stream")
-def stream_pipeline(account_id: int, prompt: str = ""):
+def stream_pipeline(account_id: int = 0, prompt: str = ""):
     return StreamingResponse(
         pipeline_service.run_pipeline_stream(account_id, prompt), 
         media_type="text/event-stream"

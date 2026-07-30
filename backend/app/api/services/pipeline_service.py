@@ -64,6 +64,54 @@ def run_pipeline_stream(account_id: int, prompt_text: str = ""):
         active_version = GovernanceVersionRepository.get_active_version() or {}
         yield yield_event("Governance Decision", "Completed", f"Active Version: v{active_version.get('version_number', 1)}. Execution allowed.")
 
+        # Step 3.5: HITL Check
+        yield yield_event("HITL Check", "Running", "Evaluating human-in-the-loop requirements...")
+        from middleware.policy_loader import load_policy
+        from common.repositories import HITLRepository
+        import time
+        master_policy_path = PROJECT_ROOT / "agents" / "master_agent" / "policy.yaml"
+        master_policy = load_policy(master_policy_path) if master_policy_path.exists() else {}
+        hitl_config = master_policy.get("hitl", {})
+        
+        if hitl_config.get("requires_human_approval", False) and any(word in user_prompt.lower() for word in ["delete", "remove", "shutdown"]):
+            reason = "High-risk keyword detected ('delete', 'remove', or 'shutdown')."
+            req_id = HITLRepository.save_request({
+                "conversation_id": "stream_" + run_id,
+                "tool_name": "pipeline_execution",
+                "risk_score": 1.0,
+                "threshold": hitl_config.get("risk_threshold", 0.7),
+                "status": "PENDING_HUMAN_APPROVAL",
+                "reason": reason
+            })
+            
+            yield yield_event("HITL Check", "approval_required", "Waiting for human approval...", payload={
+                "request_id": req_id,
+                "policy_id": master_policy.get("policy_version", "1.0"),
+                "risk_score": 1.0,
+                "reason": reason
+            })
+            
+            # Polling loop
+            approved = False
+            while True:
+                req = HITLRepository.get_request(req_id)
+                if not req:
+                    break
+                if req["status"] == "APPROVED":
+                    approved = True
+                    break
+                elif req["status"] == "REJECTED":
+                    break
+                time.sleep(1)
+            
+            if not approved:
+                yield yield_event("HITL Check", "Failed", "Execution rejected by human operator.")
+                return
+            else:
+                yield yield_event("HITL Check", "Completed", "Approved by human operator.")
+        else:
+            yield yield_event("HITL Check", "Completed", "No manual approval required.")
+
         # Step 4: Master Agent Execution
         yield yield_event("Master Agent Processing", "Running", "Evaluating user request and planning execution strategy...")
         

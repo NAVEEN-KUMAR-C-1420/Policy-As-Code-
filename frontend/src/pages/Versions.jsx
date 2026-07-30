@@ -86,8 +86,11 @@ export default function Versions({ onRefreshIntegrity }) {
             </div>
             <div>
               <span className="text-xs text-slate-400 block font-mono">GIT COMMIT SHA</span>
-              <span className="text-sm font-bold text-slate-200 font-mono flex items-center gap-1.5 mt-1">
-                <GitCommit className="w-4 h-4 text-blue-400" /> {currentVersion.git_commit_sha || 'local_head'}
+              <span className="text-sm font-bold text-slate-200 font-mono flex items-center gap-1.5 mt-1" title={currentVersion.git_commit_sha || 'local_head'}>
+                <GitCommit className="w-4 h-4 text-blue-400" /> 
+                {currentVersion.git_commit_sha 
+                  ? `${currentVersion.git_commit_sha.slice(0, 4)}...${currentVersion.git_commit_sha.slice(-4)}`
+                  : 'local_head'}
               </span>
             </div>
             <div>
@@ -131,7 +134,11 @@ export default function Versions({ onRefreshIntegrity }) {
                     <h4 className="text-xl font-black text-white">v{ver.version_number}</h4>
                     <div className="text-right">
                       <span className="text-[10px] text-slate-500 uppercase block mb-1">Commit</span>
-                      <span className="text-xs font-mono text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">{ver.git_commit_sha || 'head'}</span>
+                      <span className="text-xs font-mono text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20" title={ver.git_commit_sha || 'head'}>
+                        {ver.git_commit_sha 
+                          ? `${ver.git_commit_sha.slice(0, 4)}...${ver.git_commit_sha.slice(-4)}` 
+                          : 'head'}
+                      </span>
                     </div>
                   </div>
 

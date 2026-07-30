@@ -77,9 +77,9 @@ class ToolExecutionRepository:
 class HITLRepository:
     @staticmethod
     def save_request(entry: dict):
-        run_write(
+        return run_write(
             """INSERT INTO hitl_requests (conversation_id, tool_name, risk_score, threshold, status, created_at, reason)
-               VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)""",
+               VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?) RETURNING request_id""",
             (
                 entry.get("conversation_id"),
                 entry.get("tool_name"),
@@ -89,6 +89,11 @@ class HITLRepository:
                 entry.get("reason"),
             ),
         )
+
+    @staticmethod
+    def get_request(request_id: int) -> dict:
+        rows = run_query("SELECT * FROM hitl_requests WHERE request_id = ?", (request_id,))
+        return dict(rows[0]) if rows else None
 
     @staticmethod
     def update_status(request_id: int, status: str, approved_by: str = ""):

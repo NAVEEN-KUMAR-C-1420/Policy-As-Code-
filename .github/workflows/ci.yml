@@ -7,7 +7,7 @@ on:
     branches: ["main"]
 
 env:
-  PYTHONPATH: backend
+  PYTHONPATH: ${{ github.workspace }}/backend
   DATABASE_PROVIDER: sqlite
   GROQ_API_KEY: ci_dummy_key_not_real
   OPENAI_API_KEY: ci_dummy_key_not_real
@@ -46,8 +46,11 @@ jobs:
         run: |
           python -c "
           import sys
+          import os
+
           print(f'Python: {sys.version}')
-          print(f'PYTHONPATH includes backend: {\"backend\" in sys.path or \".\" in sys.path}')
+          print(f'Current Directory: {os.getcwd()}')
+          print(f'sys.path: {sys.path}')
 
           # Verify critical imports resolve
           try:
@@ -91,8 +94,8 @@ jobs:
               if not (base / d).is_dir():
                   errors.append(f'Missing directory: {d}/')
 
-          # Required files
-          for f in ['requirements.txt', 'pyproject.toml', '.env.example',
+          # Required files (checking backend-local files)
+          for f in ['requirements.txt', '.env.example',
                     'config/providers.yaml', 'core/paths.py', 'core/__init__.py']:
               if not (base / f).is_file():
                   errors.append(f'Missing file: {f}')
@@ -144,7 +147,6 @@ jobs:
             -v \
             --tb=short \
             --junitxml=tests/reports/junit.xml \
-            --override-ini="pythonpath=." \
             -x \
             || exit_code=$?
 
@@ -155,7 +157,7 @@ jobs:
             echo "Exit code: ${exit_code}"
             echo ""
             echo "Common fixes:"
-            echo "  - Import error: Check PYTHONPATH is set to 'backend'"
+            echo "  - Import error: Check PYTHONPATH is set correctly"
             echo "  - DB error: Ensure DATABASE_PROVIDER=sqlite and init_db.py ran"
             echo "  - API key error: Tests should not require real API keys"
             echo ""

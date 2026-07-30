@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: ["main"]
   schedule:
-    - cron: '0 0 * * 1'  # Weekly on Monday (reduced from daily to avoid noise)
+    - cron: '0 0 * * 1'
 
 jobs:
   secret-scan:
@@ -20,27 +20,20 @@ jobs:
       - name: Check for committed .env files
         run: |
           FOUND_ENV=false
-
-          # Check root .env
           if [ -f ".env" ]; then
             echo "❌ SECURITY BREACH: .env file found at repository root!"
             FOUND_ENV=true
           fi
-
-          # Check backend/.env
           if [ -f "backend/.env" ]; then
             echo "❌ SECURITY BREACH: backend/.env file found in repository!"
             FOUND_ENV=true
           fi
-
-          # Check if any .env files are tracked by git (excluding .env.example)
           TRACKED=$(git ls-files '*.env' ':!:*.env.example' ':!:.trufflehog.yml' 2>/dev/null || true)
           if [ -n "$TRACKED" ]; then
             echo "❌ SECURITY BREACH: .env files are tracked by git:"
             echo "$TRACKED"
             FOUND_ENV=true
           fi
-
           if [ "$FOUND_ENV" = true ]; then
             echo ""
             echo "HOW TO FIX:"
@@ -49,16 +42,20 @@ jobs:
             echo "  3. Rotate any exposed credentials immediately"
             exit 1
           fi
-
           echo "✅ No .env files committed. Repository is clean."
 
-      - name: TruffleHog Secret Scan
-        uses: trufflesecurity/trufflehog@v3.88.26
+      - name: TruffleHog Secret Scan (PR)
+        if: github.event_name == 'pull_request'
+        uses: trufflesecurity/trufflehog@v3.82.13
         with:
           path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
-          extra_args: >-
-            --only-verified
-            --exclude-paths=.trufflehog.yml
-            --fail
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          extra_args: --only-verified --exclude-paths=.trufflehog.yml
+
+      - name: TruffleHog Secret Scan (push/schedule)
+        if: github.event_name != 'pull_request'
+        uses: trufflesecurity/trufflehog@v3.82.13
+        with:
+          path: ./
+          extra_args: --only-verified --exclude-paths=.trufflehog.yml

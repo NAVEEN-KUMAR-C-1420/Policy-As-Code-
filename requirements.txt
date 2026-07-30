@@ -21,4 +21,8 @@ python-dotenv
 pydantic
 pytest
 
+# FastAPI API Layer
+fastapi
+uvicorn
+
 

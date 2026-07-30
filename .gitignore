@@ -1,17 +1,72 @@
+# ===========================
+# Python
+# ===========================
 .venv/
 venv/
 env/
+
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
+# ===========================
+# Environment
+# ===========================
 .env
+.env.*
+!.env.example
+
+# ===========================
 # Databases
+# ===========================
 *.db
 *.sqlite3
+
+# Ignore runtime databases
 data/*.db
-# Ignore contents of logs, but keep .gitkeep
+
+# Keep folder structure
+!data/.gitkeep
+
+# ===========================
+# Logs
+# ===========================
 logs/*
 !logs/.gitkeep
 
-# Ignore generated reports, but keep .gitkeep
+# ===========================
+# Generated Reports
+# ===========================
 reports/*
 !reports/.gitkeep
+
+# ===========================
+# FastAPI
+# ===========================
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ===========================
+# IDE
+# ===========================
+.vscode/
+.idea/
+
+# ===========================
+# OS
+# ===========================
+.DS_Store
+Thumbs.db
+
+# ===========================
+# Build
+# ===========================
+dist/
+build/
+*.egg-info/
+
+# ===========================
+# Misc
+# ===========================
+*.log

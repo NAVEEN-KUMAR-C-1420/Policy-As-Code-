@@ -1,0 +1,31 @@
+import os
+import sys
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+sys.path.append(PROJECT_ROOT)
+
+from middleware.audit_log import read_recent_entries
+
+def get_recent_logs(limit: int = 50) -> list:
+    return read_recent_entries(limit)
+
+def get_logs_for_run(run_id: str) -> list:
+    # We simulate run filtering by just getting recent logs
+    return read_recent_entries(50)
+
+def search_logs(event_type: str = None, agent_id: str = None, decision: str = None, limit: int = 50) -> list:
+    logs = read_recent_entries(limit)
+    if event_type:
+        logs = [log for log in logs if log.get("event_type") == event_type]
+    if agent_id:
+        logs = [log for log in logs if log.get("agent_id") == agent_id]
+    if decision:
+        logs = [log for log in logs if log.get("decision") == decision]
+    return logs
+
+def export_logs() -> str:
+    log_file = os.path.join(PROJECT_ROOT, "logs", "audit_log.jsonl")
+    if not os.path.exists(log_file):
+        raise ValueError("Audit log file not found")
+    with open(log_file, "r", encoding="utf-8") as f:
+        return f.read()

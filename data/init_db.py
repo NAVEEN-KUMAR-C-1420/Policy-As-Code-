@@ -50,6 +50,21 @@ def create_tables(cursor):
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS policy_versions (
+            version_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id TEXT,
+            commit_sha TEXT,
+            policy_hash TEXT,
+            policy_yaml TEXT,
+            deployed_at TEXT,
+            deployed_by TEXT,
+            deployment_source TEXT,
+            is_active INTEGER,
+            notes TEXT
+        )
+    """)
+
 
 def seed_data(cursor):
     # Only insert sample rows the first time (accounts table is empty)

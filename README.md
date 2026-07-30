@@ -48,9 +48,46 @@ At startup, `middleware/agent_policy_compat.py` checks that the model requested 
 Policy distinguishes tools by `scope` (e.g., `read`, `write`, `compute`, `delete`). For example, the `Report Writer Agent` has `delete` listed in its `denied_scopes`. Even if a delete tool were somehow granted `allowed: true` by mistake, the denied scope rule would override and block the execution.
 
 ## HITL (Human-in-the-Loop)
-Risk calculations are deterministic. If the `Risk Analyzer Agent` calculates a risk score exceeding the policy's `risk_threshold` (e.g., `0.70`), the pipeline halts and requires explicit human approval via the CLI before proceeding to the Report Writer.
+Risk calculations are deterministic. If the `Risk Analyzer Agent` calculates a risk score exceeding the policy's `risk_threshold` (e.g., `0.70`), the pipeline halts### 3. Start the Server
 
-## Data Access & PII Controls
+```bash
+uvicorn api.main:app --reload
+```
+Navigate to [http://localhost:8000/docs](http://localhost:8000/docs) to view the API Swagger UI.
+
+## API Testing
+
+A complete test suite is available in the `api_testing/` directory, built using `pytest` and FastAPI's `TestClient`. It executes against the actual endpoints without mocking.
+
+```bash
+# Run all tests
+pytest api_testing/ -v
+```
+
+## Database Support
+
+The project natively supports both local **SQLite** and remote **PostgreSQL (Supabase)**.
+
+Switch databases by configuring your `.env` file:
+
+```env
+DATABASE_PROVIDER=sqlite
+# or
+DATABASE_PROVIDER=supabase
+
+SUPABASE_DB_HOST=your-host.supabase.co
+SUPABASE_DB_PORT=5432
+SUPABASE_DB_NAME=postgres
+SUPABASE_DB_USER=postgres
+SUPABASE_DB_PASSWORD=your_password
+```
+
+When switching to Supabase, you must re-initialize the database schemas:
+```bash
+python data/init_db.py
+```
+
+## Folder Structuress & PII Controls
 Tools declare which SQLite tables they access and whether they handle PII. If `policy.yaml` restricts an agent to specific `allowed_tables` (e.g., only `transactions`) or sets `pii_allowed: false`, any tool violating these constraints is blocked at runtime.
 
 ## Data Retention

@@ -25,4 +25,12 @@ pytest
 fastapi
 uvicorn
 
+# Testing
+pytest
+httpx
+
+# Supabase / PostgreSQL
+psycopg2-binary
+supabase
+
 

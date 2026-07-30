@@ -16,23 +16,44 @@ agents have realistic data to work with.
 
 import sqlite3
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "finance.db")
+PROVIDER = os.getenv("DATABASE_PROVIDER", "sqlite").lower()
+
+def get_db_connection():
+    if PROVIDER == "supabase":
+        import psycopg2
+        return psycopg2.connect(
+            host=os.getenv("SUPABASE_DB_HOST"),
+            port=os.getenv("SUPABASE_DB_PORT"),
+            dbname=os.getenv("SUPABASE_DB_NAME"),
+            user=os.getenv("SUPABASE_DB_USER"),
+            password=os.getenv("SUPABASE_DB_PASSWORD")
+        )
+    return sqlite3.connect(DB_PATH)
 
 
 def create_tables(cursor):
-    cursor.execute("""
+    pk_type = "SERIAL PRIMARY KEY" if PROVIDER == "supabase" else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    pk_type_acc = "INTEGER PRIMARY KEY" if PROVIDER == "supabase" else "INTEGER PRIMARY KEY"
+    
+    # We must drop tables if doing a fresh init on PG maybe? No, IF NOT EXISTS is safe.
+    
+    cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS accounts (
-            account_id INTEGER PRIMARY KEY,
+            account_id {pk_type_acc},
             customer_name TEXT,
             account_type TEXT,
             balance REAL
         )
     """)
 
-    cursor.execute("""
+    cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS transactions (
-            transaction_id INTEGER PRIMARY KEY,
+            transaction_id {pk_type_acc},
             account_id INTEGER,
             txn_date TEXT,
             amount REAL,
@@ -41,18 +62,18 @@ def create_tables(cursor):
         )
     """)
 
-    cursor.execute("""
+    cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS reports (
-            report_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            report_id {pk_type},
             account_id INTEGER,
             created_at TEXT,
             summary TEXT
         )
     """)
 
-    cursor.execute("""
+    cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS policy_versions (
-            version_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            version_id {pk_type},
             agent_id TEXT,
             commit_sha TEXT,
             policy_hash TEXT,
@@ -78,8 +99,10 @@ def seed_data(cursor):
         (102, "Ravi Kumar", "current", 118500.0),
         (103, "Priya Nair", "savings", 8400.0),
     ]
+    
+    placeholder = "%s, %s, %s, %s" if PROVIDER == "supabase" else "?, ?, ?, ?"
     cursor.executemany(
-        "INSERT INTO accounts VALUES (?, ?, ?, ?)", accounts
+        f"INSERT INTO accounts VALUES ({placeholder})", accounts
     )
 
     transactions = [
@@ -91,19 +114,25 @@ def seed_data(cursor):
         (6, 103, "2026-07-02", -300.0, "utility", "Electricity bill"),
         (7, 103, "2026-07-20", -6000.0, "shopping", "Online shopping"),
     ]
+    
+    txn_ph = "%s, %s, %s, %s, %s, %s" if PROVIDER == "supabase" else "?, ?, ?, ?, ?, ?"
     cursor.executemany(
-        "INSERT INTO transactions VALUES (?, ?, ?, ?, ?, ?)", transactions
+        f"INSERT INTO transactions VALUES ({txn_ph})", transactions
     )
 
 
 def main():
-    connection = sqlite3.connect(DB_PATH)
+    connection = get_db_connection()
     cursor = connection.cursor()
     create_tables(cursor)
     seed_data(cursor)
     connection.commit()
     connection.close()
-    print(f"Dummy database ready at: {DB_PATH}")
+    
+    if PROVIDER == "supabase":
+        print(f"Supabase (PostgreSQL) database ready!")
+    else:
+        print(f"Dummy database ready at: {DB_PATH}")
 
 
 if __name__ == "__main__":

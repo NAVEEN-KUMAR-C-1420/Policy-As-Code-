@@ -8,6 +8,10 @@ __pycache__/
 *.db
 *.sqlite3
 data/*.db
-logs/
-audit_log.jsonl
-reports/
+# Ignore contents of logs, but keep .gitkeep
+logs/*
+!logs/.gitkeep
+
+# Ignore generated reports, but keep .gitkeep
+reports/*
+!reports/.gitkeep

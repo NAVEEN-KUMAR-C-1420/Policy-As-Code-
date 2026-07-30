@@ -10,6 +10,5 @@ import yaml
 
 def load_policy(policy_file_path):
     """Read a policy.yaml file and return its contents as a dictionary."""
-    with open(policy_file_path, "r") as f:
-        policy = yaml.safe_load(f)
-    return policy
+    with open(policy_file_path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)

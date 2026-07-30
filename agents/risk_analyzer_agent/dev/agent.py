@@ -11,8 +11,7 @@ import sys
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..", "..", "..")
 sys.path.append(PROJECT_ROOT)
 
-from langchain.agents import create_tool_calling_agent, AgentExecutor
-from langchain_core.prompts import ChatPromptTemplate
+from langchain.agents import create_agent
 
 from agents.risk_analyzer_agent.dev.llm_config import get_agent_llm
 from agents.risk_analyzer_agent.dev.tools import get_tools
@@ -28,32 +27,23 @@ You can READ data and COMPUTE with it, but you never write or delete
 any data."""
 
 
-def build_agent_executor():
+def build_agent():
     llm = get_agent_llm()
     tools = get_tools()
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT),
-        ("human", "{input}"),
-        ("placeholder", "{agent_scratchpad}"),
-    ])
-
-    agent = create_tool_calling_agent(llm, tools, prompt)
-    return AgentExecutor(agent=agent, tools=tools, verbose=True)
+    return create_agent(
+        model=llm,
+        tools=tools,
+        system_prompt=SYSTEM_PROMPT
+    )
 
 
-def run(account_id, collected_data):
-    """
-    Entry point called by the orchestrator.
-    Takes the account_id and the output of the Data Collector Agent,
-    and returns a risk analysis as text.
-    """
-    executor = build_agent_executor()
+def run(account_id: int, collected_data: str) -> str:
+    agent = build_agent()
     user_message = (
         f"Account ID: {account_id}\n\n"
-        f"Here is the data collected so far:\n{collected_data}\n\n"
-        f"Use your tools to check the account summary and calculate a "
-        f"risk score for this account."
+        f"Data from previous agent:\n{collected_data}\n\n"
+        "Please analyze the risk."
     )
-    result = executor.invoke({"input": user_message})
-    return result["output"]
+    result = agent.invoke({"messages": [{"role": "user", "content": user_message}]})
+    return result["messages"][-1].content

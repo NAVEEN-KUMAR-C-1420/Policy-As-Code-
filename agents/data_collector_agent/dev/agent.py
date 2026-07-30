@@ -14,8 +14,7 @@ import sys
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..", "..", "..")
 sys.path.append(PROJECT_ROOT)
 
-from langchain.agents import create_tool_calling_agent, AgentExecutor
-from langchain_core.prompts import ChatPromptTemplate
+from langchain.agents import create_agent
 
 from agents.data_collector_agent.dev.llm_config import get_agent_llm
 from agents.data_collector_agent.dev.tools import get_tools
@@ -29,29 +28,21 @@ plain text for the next agent to use.
 You are READ-ONLY. You never write, update, or delete any data."""
 
 
-def build_agent_executor():
+def build_agent():
     llm = get_agent_llm()
     tools = get_tools()
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT),
-        ("human", "{input}"),
-        ("placeholder", "{agent_scratchpad}"),
-    ])
-
-    agent = create_tool_calling_agent(llm, tools, prompt)
-    return AgentExecutor(agent=agent, tools=tools, verbose=True)
-
-
-def run(account_id):
-    """
-    Entry point called by the orchestrator.
-    Takes an account_id and returns the collected data as text.
-    """
-    executor = build_agent_executor()
-    user_message = (
-        f"Collect the transactions for account_id {account_id} and search "
-        f"for one recent piece of market news relevant to personal finance."
+    return create_agent(
+        model=llm,
+        tools=tools,
+        system_prompt=SYSTEM_PROMPT
     )
-    result = executor.invoke({"input": user_message})
-    return result["output"]
+
+def run(account_id: int) -> str:
+    agent = build_agent()
+    user_message = (
+        f"Please collect data for account {account_id}. "
+        "Find their transactions and one relevant market news piece."
+    )
+    result = agent.invoke({"messages": [{"role": "user", "content": user_message}]})
+    return result["messages"][-1].content

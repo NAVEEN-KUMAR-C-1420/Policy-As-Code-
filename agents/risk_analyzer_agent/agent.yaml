@@ -12,7 +12,6 @@ description: >
   Reads the account's balance/type from the database and computes
   a simple risk score from balance and spending. Never writes data.
 
-provider: groq
 model: "openai/gpt-oss-120b"
 temperature: 0.2
 max_tokens: 1024

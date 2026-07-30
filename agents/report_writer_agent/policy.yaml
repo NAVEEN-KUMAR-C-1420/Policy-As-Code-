@@ -5,38 +5,80 @@
 #   - save_report_to_db  -> allowed: true   (ALLOWED at runtime)
 #   - write_report_file  -> allowed: true   (ALLOWED at runtime)
 #   - delete_old_reports -> allowed: false  (BLOCKED at runtime)
+#
+# Schema version: 1.0
 # =============================================================
 
 agent_id: report_writer_agent
-version: "1.0"
+policy_version: "1.0"
 
+# --- Approved LLM models ---
+approved_models:
+  - "openai/gpt-oss-120b"
+  - "gpt-4o-mini"
+  - "claude-3-5-sonnet-20241022"
+
+# --- Tool permissions ---
 allowed_tools:
   - name: save_report_to_db
     scope: write
-    resource: "sqlite:finance.db:reports"
-    allowed_tables: [reports]
+    resource: sqlite
+    tables: [reports]
+    contains_pii: false
     allowed: true
 
   - name: write_report_file
     scope: write
-    resource: "filesystem:reports/"
+    resource: filesystem
+    tables: []
+    contains_pii: false
     allowed: true
 
   - name: delete_old_reports
     scope: delete
-    resource: "sqlite:finance.db:reports"
-    allowed: false   # explicitly blocked - this agent may never delete data
+    resource: sqlite
+    tables: [reports]
+    contains_pii: false
+    allowed: false   # explicitly blocked
 
+# --- Denied scopes ---
 denied_scopes:
   - delete
 
+# --- Guardrails ---
+guardrails:
+  pii_protection: true
+  prompt_injection_protection: true     # metadata-only
+  harmful_content_filter: true          # metadata-only
+
+# --- Human-in-the-loop ---
+hitl:
+  enabled: false
+  risk_threshold: 0.70
+  high_risk_requires_approval: false
+
+# --- Data access governance ---
+data_access:
+  pii_allowed: false
+  allowed_tables:
+    - reports
+
+# --- Data retention ---
+data_retention:
+  reports_days: 90
+  audit_logs_days: 365
+
+# --- Regulatory tags ---
+regulatory_frameworks:
+  - internal-financial-governance
+
+# --- Rate limits ---
 rate_limits:
   max_calls_per_tool: 5
 
-data_access:
-  pii_allowed: false
-  tables_allowed: [reports]   # this agent may only ever write to "reports"
-
+# --- Audit ---
 audit:
+  enabled: true
   log_inputs: true
   log_outputs: true
+  log_denied_actions: true

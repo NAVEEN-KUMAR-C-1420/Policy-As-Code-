@@ -1,36 +1,76 @@
 # =============================================================
 # Policy: Data Collector Agent
 # =============================================================
-# This file is READ and ENFORCED at runtime by
-# middleware/tool_interceptor.py - it is not just documentation.
+# This file is READ and ENFORCED at runtime by the governance
+# middleware. It is not just documentation.
+#
+# Schema version: 1.0
 # =============================================================
 
 agent_id: data_collector_agent
-version: "1.0"
+policy_version: "1.0"
 
+# --- Approved LLM models (agent startup is blocked if model not listed) ---
+approved_models:
+  - "openai/gpt-oss-120b"
+  - "gpt-4o-mini"
+  - "claude-3-5-sonnet-20241022"
+
+# --- Tool permissions (default-deny: unlisted tools are blocked) ---
 allowed_tools:
   - name: read_account_transactions
     scope: read
-    resource: "sqlite:finance.db:transactions"
-    allowed_tables: [transactions, accounts]
+    resource: sqlite
+    tables: [transactions]
+    contains_pii: false
     allowed: true
 
   - name: search_market_news
     scope: read
-    resource: "web:tavily"
+    resource: web
+    tables: []
+    contains_pii: false
     allowed: true
 
-# Scopes this agent must never be granted, even by mistake
+# --- Scopes this agent must never use, even if a rule says allowed ---
 denied_scopes:
   - write
   - delete
 
+# --- Guardrails configuration ---
+guardrails:
+  pii_protection: true
+  prompt_injection_protection: true     # metadata-only (not runtime-enforced)
+  harmful_content_filter: true          # metadata-only (not runtime-enforced)
+
+# --- Human-in-the-loop ---
+hitl:
+  enabled: false
+  risk_threshold: 0.70
+  high_risk_requires_approval: false
+
+# --- Data access governance ---
+data_access:
+  pii_allowed: false
+  allowed_tables:
+    - transactions
+
+# --- Data retention ---
+data_retention:
+  reports_days: 90
+  audit_logs_days: 365
+
+# --- Regulatory / compliance tags (metadata for now) ---
+regulatory_frameworks:
+  - internal-financial-governance
+
+# --- Rate limits ---
 rate_limits:
   max_calls_per_tool: 5
 
-data_access:
-  pii_allowed: false
-
+# --- Audit logging ---
 audit:
+  enabled: true
   log_inputs: true
   log_outputs: true
+  log_denied_actions: true

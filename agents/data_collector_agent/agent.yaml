@@ -15,7 +15,6 @@ description: >
 
 # LLM settings - "provider" is optional. If left blank, the agent
 # uses whatever is set as active_provider in config/providers.yaml.
-provider: groq
 model: "openai/gpt-oss-120b"
 temperature: 0.2
 max_tokens: 1024

@@ -1,163 +1,102 @@
-# Finance Multi-Agent Pipeline with AI Governance Middleware
+# Finance Multi-Agent Pipeline with AI Governance (Policy-as-Code)
 
-A 3-agent, **sequential** pipeline (LangChain agents, plain Python
-orchestration — **no LangGraph**) that reads dummy bank account data,
-scores risk, and writes a report. Every tool call from every agent
-passes through a runtime **policy-enforcement wrapper** before it is
-allowed to run, so this project doubles as a small AI-governance testbed.
+## What is Policy-as-Code?
+Policy-as-Code means defining security, governance, and compliance rules in structured files (like YAML) that live alongside your application code. Instead of relying on system prompts—which are easily bypassed—these rules are automatically validated and strictly enforced by middleware at runtime.
 
+## What this project demonstrates
+This project implements a complete local execution of an **agent + policy governance runtime**. It demonstrates how to separate an agent's configuration (what it *wants* to do) from its governance policy (what it is *permitted* to do), and how to enforce those boundaries strictly before and during execution using a centralized Tool Interceptor.
+
+## Three-Agent Architecture
+The pipeline consists of three sequential agents:
+
+1. **Data Collector Agent** (Read-Only): Reads raw account transactions and fetches relevant market news using Tavily.
+2. **Risk Analyzer Agent** (Read & Compute): Reads account summaries and deterministically calculates a risk score (using standard math, not LLM arithmetic) based on outflows.
+3. **Report Writer Agent** (Write-Only): Consolidates data and risk findings into a final report, saving it to SQLite and a Markdown file. It is explicitly blocked from deleting data.
+
+## `agent.yaml` vs `policy.yaml`
+- **`agent.yaml` (Configuration):** Defines what the agent is technically configured to use (e.g., name, description, model, temperature, max_tokens, requested tools).
+- **`policy.yaml` (Governance):** Defines the boundaries of what the agent is allowed to do. It sets approved models, explicitly allowed tools, denied scopes, data access limits, rate limits, and HITL thresholds. **Default behavior is DENY.**
+
+## Policy Schema & Validation
+Every agent must adhere to a strict policy schema, which includes:
+- `agent_id` and `policy_version`
+- `approved_models` (List of allowed LLMs)
+- `allowed_tools` (Tools allowed, their scope, target resource, and tables)
+- `denied_scopes` (Scopes the agent must never access, e.g., `delete`)
+- `guardrails` (PII protection, harmful content filters)
+- `hitl` (Human-in-the-loop thresholds)
+- `data_access` (Table-level restrictions and PII rules)
+- `data_retention` (Data lifecycle policies)
+- `regulatory_frameworks` (Compliance tags)
+- `rate_limits` (Execution limits per tool)
+- `audit` (Logging preferences)
+
+The **Policy Validator** (`middleware/policy_validator.py`) strictly checks this schema before any agent can start. Missing fields, invalid types, or negative retention limits will block the agent.
+
+## Runtime Enforcement
+Governance is strictly enforced by `middleware/tool_interceptor.py`:
+- Every tool call is intercepted.
+- If a tool is unknown or not explicitly allowed in `policy.yaml`, it is **blocked**.
+- If a tool falls under a `denied_scope`, it is **blocked** (deny takes precedence).
+- If rate limits are exceeded, it is **blocked**.
+- Every decision (ALLOWED, DENIED, RATE_LIMITED) is recorded.
+
+## Approved Models
+At startup, `middleware/agent_policy_compat.py` checks that the model requested in `agent.yaml` exists within the `approved_models` list in `policy.yaml`. If an agent tries to use an unapproved model, startup fails immediately.
+
+## Tool Scopes
+Policy distinguishes tools by `scope` (e.g., `read`, `write`, `compute`, `delete`). For example, the `Report Writer Agent` has `delete` listed in its `denied_scopes`. Even if a delete tool were somehow granted `allowed: true` by mistake, the denied scope rule would override and block the execution.
+
+## HITL (Human-in-the-Loop)
+Risk calculations are deterministic. If the `Risk Analyzer Agent` calculates a risk score exceeding the policy's `risk_threshold` (e.g., `0.70`), the pipeline halts and requires explicit human approval via the CLI before proceeding to the Report Writer.
+
+## Data Access & PII Controls
+Tools declare which SQLite tables they access and whether they handle PII. If `policy.yaml` restricts an agent to specific `allowed_tables` (e.g., only `transactions`) or sets `pii_allowed: false`, any tool violating these constraints is blocked at runtime.
+
+## Data Retention
+The `middleware/data_retention.py` module provides deterministic functions to identify and clean up old database reports and audit logs based on the policy's `data_retention` values (e.g., `reports_days: 90`). Dangerous deletion functions must be manually invoked and are governed to prevent accidental data loss.
+
+## Audit Logging
+Every governance event is recorded as a JSONL entry in `logs/audit_log.jsonl`. This includes tool calls, model checks, HITL checks, and policy validation results. Crucially, raw PII and API keys are never logged.
+
+## Database Schema
+The dummy SQLite database (`data/finance.db`) contains three tables:
+- `accounts`: account_id, customer_name, account_type, balance
+- `transactions`: transaction_id, account_id, txn_date, amount, category, description
+- `reports`: report_id, account_id, created_at, summary
+
+## Setup & Execution
+
+### 1. Initialize the Database
+```bash
+python data/init_db.py
 ```
-Data Collector Agent  --->  Risk Analyzer Agent  --->  Report Writer Agent
-   (read-only)                (read + compute)            (write only)
-```
 
-## Why this design
-
-- **Sequential, not graph-based**: `orchestrator/run_pipeline.py` is a
-  plain Python script that calls agent 1, then feeds its output into
-  agent 2, then agent 3. No LangGraph, no hidden state machine — just
-  three function calls in order.
-- **Provider-swappable**: every agent asks `common/llm_loader.py` for
-  its LLM. That file reads `config/providers.yaml`, which currently
-  points at Groq. Switch to OpenAI or Anthropic by editing **one line**
-  in that one file — no agent code changes.
-- **Policy is enforced, not just documented**: each agent's
-  `policy.yaml` is loaded and checked by
-  `middleware/tool_interceptor.py` on **every single tool call**,
-  before the real tool logic runs. Blocked calls never execute.
-
-## Folder structure
-
-```
-finance_multi_agent_governance/
-├── config/
-│   └── providers.yaml          # <- change LLM provider here
-├── common/
-│   ├── llm_loader.py           # builds the LLM for the active provider
-│   └── db.py                   # shared SQLite read/write helpers
-├── data/
-│   └── init_db.py              # creates + seeds the dummy finance.db
-├── middleware/                 # <- the governance layer
-│   ├── policy_loader.py        # loads a policy.yaml into a dict
-│   ├── tool_interceptor.py     # guard_tool(): the enforcement wrapper
-│   └── audit_log.py            # writes every decision to logs/
-├── agents/
-│   ├── data_collector_agent/
-│   │   ├── agent.yaml          # identity + LLM + tool list
-│   │   ├── policy.yaml         # governance rules (enforced!)
-│   │   └── dev/
-│   │       ├── llm_config.py
-│   │       ├── tools.py
-│   │       └── agent.py        # builds the AgentExecutor, run()
-│   ├── risk_analyzer_agent/    # same 3-file / dev-folder pattern
-│   └── report_writer_agent/    # same 3-file / dev-folder pattern
-├── orchestrator/
-│   └── run_pipeline.py         # runs all 3 agents in sequence
-├── test_policy_enforcement.py  # proves governance works, no API key needed
-├── logs/audit_log.jsonl        # every ALLOWED / BLOCKED decision
-└── reports/                    # markdown reports land here
-```
-
-Every agent follows the same **3-file + dev-folder** pattern the brief
-asked for: `agent.yaml`, `policy.yaml`, and a `dev/` folder holding the
-actual LLM config, tools, and agent-building code.
-
-## The 3 agents and their tool scopes
-
-| Agent | Tools | Scope |
-|---|---|---|
-| Data Collector | `read_account_transactions`, `search_market_news` | read |
-| Risk Analyzer | `read_account_summary`, `calculate_risk_score` | read, compute |
-| Report Writer | `save_report_to_db`, `write_report_file`, ~~`delete_old_reports`~~ | write (delete is blocked) |
-
-`delete_old_reports` is real, working code inside
-`report_writer_agent/dev/tools.py`, but its `policy.yaml` entry sets
-`allowed: false`. It's also left out of the tool list handed to the
-LLM. It exists purely so you can prove the interceptor blocks it — see
-`test_policy_enforcement.py`.
-
-## How the governance wrapper works
-
-Every tool is built in the same 3 steps (see any `dev/tools.py`):
-
-1. Write a plain Python function that does the real work.
-2. Wrap it: `guard_tool(tool_name, policy, agent_id, the_function)`
-3. Hand the **wrapped** version to LangChain as a `StructuredTool`.
-
-`guard_tool()` (in `middleware/tool_interceptor.py`) checks, on every
-call:
-
-- Is this tool listed in `policy.yaml` with `allowed: true`? If not → **BLOCKED**.
-- Has the agent exceeded `rate_limits.max_calls_per_tool`? If so → **BLOCKED**.
-- Otherwise the real function runs, and the result is returned.
-
-Either way, an entry is appended to `logs/audit_log.jsonl` recording
-the agent, tool, scope, inputs, a preview of the output, and the
-decision — a simple audit trail you can build validation/reporting on
-top of.
-
-## Setup
-
+### 2. Install Dependencies
 ```bash
 pip install -r requirements.txt
-cp .env.example .env       # then fill in your API keys
-python data/init_db.py     # creates data/finance.db with 3 sample accounts
 ```
 
-### Try the governance layer first (no API key needed)
+### 3. Setup Environment
+Copy `.env.example` to `.env` and fill in your API keys (e.g., `GROQ_API_KEY`, `TAVILY_API_KEY`).
 
+### 4. Run Governance Tests (No API Keys Required)
+The test suite proves the middleware works, even offline.
 ```bash
-python test_policy_enforcement.py
+python test_governance.py
 ```
 
-This calls one allowed tool and one blocked tool directly, so you can
-see the middleware work without spending any LLM tokens. Then check:
-
-```bash
-cat logs/audit_log.jsonl
-```
-
-### Run the full pipeline (needs a Groq API key by default)
-
+### 5. Run the Full Pipeline
 ```bash
 python orchestrator/run_pipeline.py
 ```
 
-Change the account by editing `ACCOUNT_ID` at the bottom of
-`orchestrator/run_pipeline.py`. Sample accounts: `101`, `102`, `103`.
-
-## Switching LLM providers
-
-Edit `config/providers.yaml`:
-
-```yaml
-active_provider: openai   # was: groq
-```
-
-Make sure `OPENAI_API_KEY` is set in `.env`. That's the only change
-needed — every agent picks it up automatically through
-`common/llm_loader.py`. `anthropic` is supported the same way.
-
-## Optional integrations
-
-- **Tavily**: set `TAVILY_API_KEY` in `.env` and the Data Collector
-  Agent's `search_market_news` tool will do live web search. Without
-  a key, it just returns a message saying the search was skipped —
-  the pipeline still runs.
-- **LangSmith**: set `LANGCHAIN_TRACING_V2=true`,
-  `LANGCHAIN_API_KEY`, and `LANGCHAIN_PROJECT` in `.env`. LangChain
-  reads these automatically, so every LLM call and tool call in this
-  project shows up in your LangSmith dashboard — no code changes.
-
-## Notes
-
-- The database is a **dummy** SQLite file with 3 fake accounts and a
-  handful of transactions, purely so the tools have something real to
-  read and write. See `data/init_db.py` to change the sample data.
-- The Groq default model (`openai/gpt-oss-120b`) is Groq's current
-  recommended general-purpose model as of mid-2026 — check
-  `console.groq.com/docs/models` if you hit a deprecation error, and
-  update `config/providers.yaml`.
-- Code is intentionally kept simple (plain functions, no metaclasses
-  or clever abstractions) so it's easy to read, extend, and audit —
-  which matters a lot for a governance-focused project.
+## Intentionally NOT Implemented
+This phase focused solely on a complete local implementation of the policy schema, validation, and runtime enforcement. The following features belong to the next phase:
+- GitHub Actions / CI/CD deployment
+- Git SHA versioning endpoints
+- Policy drift detection
+- Dev/staging/prod policy promotion
+- Pull-Request approval workflows
+- Docker, Kubernetes, and Cloud deployment
+- Web frontend / Authentication UI

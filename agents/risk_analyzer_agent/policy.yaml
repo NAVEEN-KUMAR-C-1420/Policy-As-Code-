@@ -1,32 +1,76 @@
 # =============================================================
 # Policy: Risk Analyzer Agent
 # =============================================================
+# This file is READ and ENFORCED at runtime by the governance
+# middleware. It is not just documentation.
+#
+# Schema version: 1.0
+# =============================================================
 
 agent_id: risk_analyzer_agent
-version: "1.0"
+policy_version: "1.0"
 
+# --- Approved LLM models ---
+approved_models:
+  - "openai/gpt-oss-120b"
+  - "gpt-4o-mini"
+  - "claude-3-5-sonnet-20241022"
+
+# --- Tool permissions ---
 allowed_tools:
   - name: read_account_summary
     scope: read
-    resource: "sqlite:finance.db:accounts"
-    allowed_tables: [accounts]
+    resource: sqlite
+    tables: [accounts]
+    contains_pii: false
     allowed: true
 
   - name: calculate_risk_score
     scope: compute
-    resource: "local:python"
+    resource: local
+    tables: []
+    contains_pii: false
     allowed: true
 
+# --- Denied scopes ---
 denied_scopes:
   - write
   - delete
 
+# --- Guardrails ---
+guardrails:
+  pii_protection: true
+  prompt_injection_protection: true     # metadata-only
+  harmful_content_filter: true          # metadata-only
+
+# --- Human-in-the-loop ---
+hitl:
+  enabled: true
+  risk_threshold: 0.70
+  high_risk_requires_approval: true
+
+# --- Data access governance ---
+data_access:
+  pii_allowed: false
+  allowed_tables:
+    - accounts
+
+# --- Data retention ---
+data_retention:
+  reports_days: 90
+  audit_logs_days: 365
+
+# --- Regulatory tags ---
+regulatory_frameworks:
+  - internal-financial-governance
+
+# --- Rate limits ---
 rate_limits:
   max_calls_per_tool: 5
 
-data_access:
-  pii_allowed: false
-
+# --- Audit ---
 audit:
+  enabled: true
   log_inputs: true
   log_outputs: true
+  log_denied_actions: true

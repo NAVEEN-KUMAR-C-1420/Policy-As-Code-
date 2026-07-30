@@ -11,8 +11,7 @@ import sys
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..", "..", "..")
 sys.path.append(PROJECT_ROOT)
 
-from langchain.agents import create_tool_calling_agent, AgentExecutor
-from langchain_core.prompts import ChatPromptTemplate
+from langchain.agents import create_agent
 
 from agents.report_writer_agent.dev.llm_config import get_agent_llm
 from agents.report_writer_agent.dev.tools import get_tools
@@ -27,32 +26,23 @@ a report file.
 You can WRITE data, but you are never allowed to delete anything."""
 
 
-def build_agent_executor():
+def build_agent():
     llm = get_agent_llm()
     tools = get_tools()
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT),
-        ("human", "{input}"),
-        ("placeholder", "{agent_scratchpad}"),
-    ])
+    return create_agent(
+        model=llm,
+        tools=tools,
+        system_prompt=SYSTEM_PROMPT
+    )
 
-    agent = create_tool_calling_agent(llm, tools, prompt)
-    return AgentExecutor(agent=agent, tools=tools, verbose=True)
-
-
-def run(account_id, collected_data, risk_report):
-    """
-    Entry point called by the orchestrator.
-    Takes everything collected so far and produces + saves the
-    final report.
-    """
-    executor = build_agent_executor()
+def run(account_id: int, collected_data: str, risk_report: str) -> str:
+    agent = build_agent()
     user_message = (
         f"Account ID: {account_id}\n\n"
-        f"Collected data:\n{collected_data}\n\n"
-        f"Risk analysis:\n{risk_report}\n\n"
-        f"Write the final report and save it using your tools."
+        f"Collected Data:\n{collected_data}\n\n"
+        f"Risk Report:\n{risk_report}\n\n"
+        "Please write the final report, save it to the DB, and write it to a file."
     )
-    result = executor.invoke({"input": user_message})
-    return result["output"]
+    result = agent.invoke({"messages": [{"role": "user", "content": user_message}]})
+    return result["messages"][-1].content

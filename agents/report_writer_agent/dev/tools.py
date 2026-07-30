@@ -11,13 +11,12 @@ the LLM (see get_tools() at the bottom):
                                              even if it were called directly.
 
 delete_old_reports exists on purpose, as a governance demonstration:
-see test_policy_enforcement.py at the project root to watch it get
-blocked and logged.
+see the test suite to watch it get blocked and logged.
 """
 
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..", "..", "..")
 sys.path.append(PROJECT_ROOT)
@@ -27,9 +26,12 @@ from common.db import run_write
 from middleware.tool_interceptor import guard_tool
 from middleware.policy_loader import load_policy
 
-AGENT_ID = "report_writer_agent"
-POLICY_PATH = os.path.join(os.path.dirname(__file__), "..", "policy.yaml")
+AGENT_DIR = os.path.join(os.path.dirname(__file__), "..")
+POLICY_PATH = os.path.join(AGENT_DIR, "policy.yaml")
 policy = load_policy(POLICY_PATH)
+
+# Read agent_id from policy to avoid hardcoded duplication
+AGENT_ID = policy.get("agent_id", "report_writer_agent")
 
 REPORTS_DIR = os.path.join(PROJECT_ROOT, "reports")
 
@@ -42,7 +44,7 @@ def _save_report_to_db(account_id: int, summary: str) -> str:
     """Insert a new report row into the reports table."""
     run_write(
         "INSERT INTO reports (account_id, created_at, summary) VALUES (?, ?, ?)",
-        (account_id, datetime.utcnow().isoformat(), summary),
+        (account_id, datetime.now(timezone.utc).isoformat(), summary),
     )
     return f"Report saved to database for account {account_id}."
 
@@ -51,7 +53,7 @@ def _write_report_file(account_id: int, content: str) -> str:
     """Write the report as a markdown file inside the reports/ folder."""
     os.makedirs(REPORTS_DIR, exist_ok=True)
     file_path = os.path.join(REPORTS_DIR, f"report_{account_id}.md")
-    with open(file_path, "w") as f:
+    with open(file_path, "w", encoding="utf-8") as f:
         f.write(content)
     return f"Report saved to file: {file_path}"
 
@@ -59,8 +61,9 @@ def _write_report_file(account_id: int, content: str) -> str:
 def _delete_old_reports(account_id: int) -> str:
     """
     DANGEROUS on purpose: deletes all saved reports for an account.
-    policy.yaml marks this tool as allowed: false, so guard_tool()
-    should always block it before this code ever runs.
+    policy.yaml marks this tool as allowed: false AND its scope
+    (delete) is in denied_scopes, so guard_tool() should always
+    block it before this code ever runs.
     """
     run_write("DELETE FROM reports WHERE account_id = ?", (account_id,))
     return f"All reports deleted for account {account_id}."

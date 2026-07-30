@@ -3,11 +3,14 @@ Tools - Risk Analyzer Agent
 ==============================
 This agent has 2 tools:
   - read_account_summary   (scope: read    - reads the SQLite database)
-  - calculate_risk_score   (scope: compute - pure math, no I/O at all)
+  - calculate_risk_score   (scope: compute - DETERMINISTIC math, no LLM)
 
-Showing a "compute" scope alongside "read" is intentional: it
-demonstrates that policy.yaml can tell tools apart by what kind of
-access they need, not just a simple allow/deny switch.
+The risk score is calculated deterministically from actual transaction
+data in the database. The LLM may explain the result but does not
+decide the arithmetic.
+
+IMPORTANT: The risk model here is a DEMO HEURISTIC for governance
+demonstration. It is NOT a real financial credit/risk model.
 """
 
 import os
@@ -21,9 +24,12 @@ from common.db import run_query
 from middleware.tool_interceptor import guard_tool
 from middleware.policy_loader import load_policy
 
-AGENT_ID = "risk_analyzer_agent"
-POLICY_PATH = os.path.join(os.path.dirname(__file__), "..", "policy.yaml")
+AGENT_DIR = os.path.join(os.path.dirname(__file__), "..")
+POLICY_PATH = os.path.join(AGENT_DIR, "policy.yaml")
 policy = load_policy(POLICY_PATH)
+
+# Read agent_id from policy to avoid hardcoded duplication
+AGENT_ID = policy.get("agent_id", "risk_analyzer_agent")
 
 
 # ------------------------------------------------------------------
@@ -31,37 +37,86 @@ policy = load_policy(POLICY_PATH)
 # ------------------------------------------------------------------
 
 def _read_account_summary(account_id: int) -> str:
-    """Read the balance and account type for one account."""
+    """
+    Read the balance and account type for one account.
+    NOTE: Does NOT select customer_name (PII) since this agent's
+    policy has pii_allowed=false.
+    """
     rows = run_query(
-        "SELECT account_type, balance FROM accounts WHERE account_id = ?",
+        "SELECT account_id, account_type, balance FROM accounts WHERE account_id = ?",
         (account_id,),
     )
     if not rows:
         return f"No account found with id {account_id}."
 
     account = rows[0]
-    return f"account_type={account['account_type']}, balance={account['balance']}"
+    return f"account_id={account['account_id']}, account_type={account['account_type']}, balance={account['balance']}"
 
 
-def _calculate_risk_score(balance: float, monthly_outflow: float) -> str:
+def _calculate_risk_score(account_id: int) -> str:
     """
-    A simple, beginner-friendly risk heuristic:
-    compares how much money leaves the account each month against
-    the current balance. No database or network access - pure math.
+    DETERMINISTIC risk calculation from actual transaction data.
+
+    Steps:
+      1. Read the account balance from the database
+      2. Sum all negative transactions (outflows) for that account
+      3. Calculate risk_score = abs(total_outflow) / balance
+      4. Normalize to 0.0 - 1.0 range
+
+    This is a DEMO HEURISTIC, not a real financial risk model.
+    The result is a normalized score where:
+      0.0 - 0.20 = Low risk
+      0.20 - 0.50 = Medium risk
+      0.50 - 0.70 = High risk
+      0.70 - 1.00 = Critical risk (triggers HITL if enabled)
     """
+    # Step 1: Get account balance
+    accounts = run_query(
+        "SELECT balance FROM accounts WHERE account_id = ?",
+        (account_id,),
+    )
+    if not accounts:
+        return (
+            '{"error": "Account not found", "account_id": ' +
+            str(account_id) + '}'
+        )
+
+    balance = accounts[0]["balance"]
+
+    # Step 2: Sum all negative transactions (outflows)
+    outflow_rows = run_query(
+        "SELECT COALESCE(SUM(ABS(amount)), 0) as total_outflow "
+        "FROM transactions WHERE account_id = ? AND amount < 0",
+        (account_id,),
+    )
+    total_outflow = outflow_rows[0]["total_outflow"] if outflow_rows else 0.0
+
+    # Step 3: Calculate ratio
     if balance <= 0:
-        return "Risk level: High (balance is zero or negative)"
-
-    ratio = monthly_outflow / balance
-
-    if ratio > 0.5:
-        risk_level = "High"
-    elif ratio > 0.2:
-        risk_level = "Medium"
+        risk_score = 1.0
+        risk_level = "Critical"
     else:
-        risk_level = "Low"
+        ratio = total_outflow / balance
+        # Normalize: cap at 1.0
+        risk_score = min(ratio, 1.0)
 
-    return f"Risk level: {risk_level} (outflow/balance ratio = {round(ratio, 2)})"
+        if risk_score > 0.70:
+            risk_level = "Critical"
+        elif risk_score > 0.50:
+            risk_level = "High"
+        elif risk_score > 0.20:
+            risk_level = "Medium"
+        else:
+            risk_level = "Low"
+
+    return (
+        f'{{"account_id": {account_id}, '
+        f'"balance": {balance}, '
+        f'"total_outflow": {total_outflow}, '
+        f'"risk_score": {round(risk_score, 4)}, '
+        f'"risk_level": "{risk_level}", '
+        f'"model": "DEMO_HEURISTIC: outflow/balance ratio"}}'
+    )
 
 
 # ------------------------------------------------------------------
@@ -95,15 +150,18 @@ def get_tools():
             name="read_account_summary",
             description=(
                 "Read the account_type and balance for a given account_id "
-                "(integer) from the finance database. Read-only."
+                "(integer) from the finance database. Read-only. Does not "
+                "return PII like customer names."
             ),
         ),
         StructuredTool.from_function(
             func=guarded_calculate_risk,
             name="calculate_risk_score",
             description=(
-                "Calculate a risk level from balance (float) and "
-                "monthly_outflow (float, positive number). Pure computation."
+                "Calculate a deterministic risk score for a given account_id "
+                "(integer). Reads balance and transactions from the database "
+                "and returns a normalized risk score from 0.0 to 1.0. "
+                "This is a demo heuristic, not a real financial risk model."
             ),
         ),
     ]

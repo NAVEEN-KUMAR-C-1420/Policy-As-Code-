@@ -23,9 +23,12 @@ from common.db import run_query
 from middleware.tool_interceptor import guard_tool
 from middleware.policy_loader import load_policy
 
-AGENT_ID = "data_collector_agent"
-POLICY_PATH = os.path.join(os.path.dirname(__file__), "..", "policy.yaml")
+AGENT_DIR = os.path.join(os.path.dirname(__file__), "..")
+POLICY_PATH = os.path.join(AGENT_DIR, "policy.yaml")
 policy = load_policy(POLICY_PATH)
+
+# Read agent_id from policy to avoid hardcoded duplication
+AGENT_ID = policy.get("agent_id", "data_collector_agent")
 
 
 # ------------------------------------------------------------------
@@ -33,7 +36,10 @@ policy = load_policy(POLICY_PATH)
 # ------------------------------------------------------------------
 
 def _read_account_transactions(account_id: int) -> str:
-    """Read all transactions for one account from the finance database."""
+    """
+    Read all transactions for one account from the finance database.
+    NOTE: Does NOT select customer_name or other PII fields.
+    """
     rows = run_query(
         "SELECT txn_date, amount, category, description "
         "FROM transactions WHERE account_id = ?",
@@ -55,16 +61,19 @@ def _search_market_news(query: str) -> str:
     if not api_key:
         return "TAVILY_API_KEY not set - skipping live news search."
 
-    from tavily import TavilyClient
-    client = TavilyClient(api_key=api_key)
-    response = client.search(query=query, max_results=3)
+    try:
+        from tavily import TavilyClient
+        client = TavilyClient(api_key=api_key)
+        response = client.search(query=query, max_results=3)
 
-    results = response.get("results", [])
-    if not results:
-        return "No news found."
+        results = response.get("results", [])
+        if not results:
+            return "No news found."
 
-    lines = [f"- {item.get('title')}: {item.get('url')}" for item in results]
-    return "\n".join(lines)
+        lines = [f"- {item.get('title')}: {item.get('url')}" for item in results]
+        return "\n".join(lines)
+    except Exception as e:
+        return f"Market news search failed (degraded gracefully): {e}"
 
 
 # ------------------------------------------------------------------

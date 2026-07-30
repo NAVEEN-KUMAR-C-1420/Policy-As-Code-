@@ -84,6 +84,19 @@ def guard_tool(tool_name: str, policy: dict, agent_id: str, original_function):
                 "decision": "DENIED",
                 "reason": "Tool not found in policy (default: DENY)",
             })
+            
+            from common.repositories import ToolExecutionRepository
+            ToolExecutionRepository.save({
+                "conversation_id": "system_generated",
+                "tool_name": tool_name,
+                "allowed": False,
+                "blocked": True,
+                "reason": "Tool not found in policy (default: DENY)",
+                "risk_score": 0.0,
+                "policy_version": "unknown",
+                "duration": 0.0
+            })
+            
             return (
                 f"BLOCKED BY POLICY: agent '{agent_id}' is not allowed "
                 f"to use tool '{tool_name}' (unknown tool)."
@@ -194,7 +207,10 @@ def guard_tool(tool_name: str, policy: dict, agent_id: str, original_function):
             )
 
         # ---- ALL checks passed - run the real tool ----
+        import time
+        start_time = time.time()
         result = original_function(*args, **kwargs)
+        duration = time.time() - start_time
 
         output_preview = str(result)[:500] if log_outputs else "[redacted]"
         write_audit_entry({
@@ -206,6 +222,18 @@ def guard_tool(tool_name: str, policy: dict, agent_id: str, original_function):
             "kwargs": safe_kwargs,
             "output_preview": output_preview,
             "decision": "ALLOWED",
+        })
+
+        from common.repositories import ToolExecutionRepository
+        ToolExecutionRepository.save({
+            "conversation_id": "system_generated",
+            "tool_name": tool_name,
+            "allowed": True,
+            "blocked": False,
+            "reason": "Policy rules passed",
+            "risk_score": 0.0,
+            "policy_version": "unknown",
+            "duration": duration
         })
 
         return result

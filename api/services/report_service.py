@@ -23,7 +23,11 @@ def delete_report(report_id: int) -> dict:
     return {"status": "deleted", "report_id": report_id}
 
 def download_report(report_id: int) -> str:
-    rows = run_query("SELECT summary FROM reports WHERE report_id = ?", (report_id,))
+    rows = run_query("SELECT report_content, summary FROM reports WHERE report_id = ?", (report_id,))
     if not rows:
         raise ValueError("Report not found")
-    return rows[0]["summary"]
+    # Return report_content if it exists, fallback to summary for backward compatibility
+    content = rows[0].get("report_content")
+    if content:
+        return content
+    return rows[0].get("summary", "")

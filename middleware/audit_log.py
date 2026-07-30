@@ -19,49 +19,46 @@ Event types recorded:
 IMPORTANT: This module never logs API keys, secrets, or raw PII.
 """
 
-import json
-import os
+from common.repositories import AuditRepository
 from datetime import datetime, timezone
-
-LOG_FILE_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "logs", "audit_log.jsonl"
-)
-
+import os
+import json
 
 def write_audit_entry(entry: dict):
     """
-    Append one audit entry to the JSONL log file.
+    Store one audit entry into the database.
 
     'entry' should be a dictionary with fields like:
         agent_id, event_type, tool_name, scope, decision, reason
-
-    A UTC timestamp is automatically added.
     """
-    os.makedirs(os.path.dirname(LOG_FILE_PATH), exist_ok=True)
-
-    entry["timestamp"] = datetime.now(timezone.utc).isoformat()
-
-    with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    if "timestamp" not in entry:
+        entry["timestamp"] = datetime.now(timezone.utc).isoformat()
+    
+    # Supabase uses JSON fields, but our schema expects stringification if metadata.
+    # The repository handles the SQL insert.
+    AuditRepository.save(entry)
 
 
 def read_recent_entries(n: int = 50) -> list:
     """
-    Read the last N entries from the audit log.
-    Returns a list of dictionaries (most recent last).
-    Useful for testing and verification.
+    Read the last N entries from the audit log database.
     """
-    if not os.path.exists(LOG_FILE_PATH):
-        return []
-
+    rows = AuditRepository.get_recent(limit=n)
+    
+    # Re-map DB row fields back to the expected dictionary formats for testing backwards compatibility.
     entries = []
-    with open(LOG_FILE_PATH, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                try:
-                    entries.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
-
-    return entries[-n:]
+    for row in rows:
+        parsed = dict(row)
+        if "action" in parsed and parsed["action"]:
+            parsed["event_type"] = parsed["action"]
+        if "agent_name" in parsed and parsed["agent_name"]:
+            parsed["agent_id"] = parsed["agent_name"]
+        if "metadata" in parsed and parsed["metadata"]:
+            try:
+                parsed["metadata"] = json.loads(parsed["metadata"])
+            except:
+                pass
+        entries.append(parsed)
+        
+    # Re-reverse to put oldest first, as previous logic did (it read file top to bottom and took last N)
+    return entries[::-1]

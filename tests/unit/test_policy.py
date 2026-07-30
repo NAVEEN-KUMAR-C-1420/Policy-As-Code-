@@ -18,25 +18,24 @@ After running, open logs/audit_log.jsonl to see both decisions recorded.
 import os
 import sys
 
-sys.path.append(os.path.dirname(__file__))
+# Ensure PROJECT_ROOT is reachable
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, PROJECT_ROOT)
 
-# Make sure the dummy database exists before we query it
 from data.init_db import main as init_db
 init_db()
 
 from agents.data_collector_agent.dev.tools import guarded_read_transactions
 from agents.report_writer_agent.dev.tools import guarded_delete_old_reports
 
-print("\n--- Test 1: ALLOWED tool call ---")
-print("Calling read_account_transactions for account 101 "
-      "(policy.yaml allows this)...\n")
-result_allowed = guarded_read_transactions(account_id=101)
-print(result_allowed)
+def test_allowed_tool_call():
+    """Test that an ALLOWED tool call passes policy.yaml and runs."""
+    result = guarded_read_transactions(account_id=101)
+    assert result is not None
+    assert "BLOCKED BY POLICY" not in str(result)
 
-print("\n--- Test 2: BLOCKED tool call ---")
-print("Calling delete_old_reports for account 101 "
-      "(policy.yaml sets allowed: false for this tool)...\n")
-result_blocked = guarded_delete_old_reports(account_id=101)
-print(result_blocked)
-
-print("\nDone. Check logs/audit_log.jsonl to see both decisions recorded.")
+def test_blocked_tool_call():
+    """Test that a BLOCKED tool call is denied by policy.yaml and never runs."""
+    result = guarded_delete_old_reports(account_id=101)
+    assert result is not None
+    assert "BLOCKED BY POLICY" in str(result)

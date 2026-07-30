@@ -22,7 +22,7 @@ import tempfile
 import sqlite3
 
 # Ensure project root is in path
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, PROJECT_ROOT)
 
 # Make sure the dummy database exists
@@ -595,70 +595,3 @@ def test_24_db_integrity():
     print("  PASS: TEST 24 - Database integrity verified")
 
 
-# ================================================================
-# Run all tests
-# ================================================================
-
-def run_all_tests():
-    """Run all governance tests and report results."""
-    tests = [
-        test_01_valid_policy_passes,
-        test_02_missing_approved_models,
-        test_03_missing_hitl,
-        test_04_missing_retention,
-        test_05_agent_id_mismatch,
-        test_06_unapproved_model,
-        test_07_tool_not_in_policy,
-        test_08_allowed_tool_executes,
-        test_09_denied_tool_blocked,
-        test_10_unknown_tool_blocked,
-        test_11_denied_scope_overrides_allow,
-        test_12_rate_limit,
-        test_13_table_restriction,
-        test_13b_pii_restriction,
-        test_14_deterministic_risk,
-        test_15_hitl_triggered,
-        test_16_audit_logging,
-        test_17_real_agent_policies,
-        test_18_real_agent_compat,
-        test_19_delete_blocked,
-        test_20_hitl_threshold_range,
-        test_21_negative_retention,
-        test_22_data_retention,
-        test_23_missing_regulatory,
-        test_24_db_integrity,
-    ]
-
-    passed = 0
-    failed = 0
-    errors_list = []
-
-    print("\n" + "=" * 60)
-    print("  GOVERNANCE TEST SUITE")
-    print("  No LLM API keys required")
-    print("=" * 60 + "\n")
-
-    for test_fn in tests:
-        try:
-            test_fn()
-            passed += 1
-        except Exception as e:
-            failed += 1
-            errors_list.append((test_fn.__name__, str(e)))
-            print(f"  FAIL: {test_fn.__name__}: {e}")
-
-    print(f"\n{'='*60}")
-    print(f"  RESULTS: {passed} passed, {failed} failed, {len(tests)} total")
-    print(f"{'='*60}")
-
-    if errors_list:
-        print("\n  Failures:")
-        for name, err in errors_list:
-            print(f"    - {name}: {err}")
-
-    return failed == 0
-
-
-if __name__ == "__main__":
-    success = run_all_tests()
-    sys.exit(0 if success else 1)

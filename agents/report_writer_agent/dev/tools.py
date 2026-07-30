@@ -49,13 +49,12 @@ def _save_report_to_db(account_id: int, summary: str) -> str:
     return f"Report saved to database for account {account_id}."
 
 
+from common.repositories import ReportRepository
+
 def _write_report_file(account_id: int, content: str) -> str:
-    """Write the report as a markdown file inside the reports/ folder."""
-    os.makedirs(REPORTS_DIR, exist_ok=True)
-    file_path = os.path.join(REPORTS_DIR, f"report_{account_id}.md")
-    with open(file_path, "w", encoding="utf-8") as f:
-        f.write(content)
-    return f"Report saved to file: {file_path}"
+    """Store the full report content (markdown string) in the database via the repository."""
+    ReportRepository.save_report_content(account_id, content, generated_by=AGENT_ID)
+    return f"Report saved to database for account {account_id}."
 
 
 def _delete_old_reports(account_id: int) -> str:

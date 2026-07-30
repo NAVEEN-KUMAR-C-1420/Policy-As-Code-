@@ -72,6 +72,16 @@ def check_hitl(risk_score: float, policy: dict, agent_id: str = "") -> dict:
             "risk_score": risk_score,
             "risk_threshold": risk_threshold,
         })
+        
+        from common.repositories import HITLRepository
+        HITLRepository.save_request({
+            "conversation_id": "system_generated",
+            "tool_name": "unknown_tool",
+            "risk_score": risk_score,
+            "threshold": risk_threshold,
+            "status": "PENDING_HUMAN_APPROVAL",
+            "reason": f"Risk score {risk_score:.2f} exceeds threshold {risk_threshold:.2f}"
+        })
     else:
         write_audit_entry({
             "agent_id": agent_id,

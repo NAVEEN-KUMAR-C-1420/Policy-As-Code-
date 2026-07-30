@@ -79,8 +79,104 @@ def create_tables(cursor):
         CREATE TABLE IF NOT EXISTS reports (
             report_id {pk_type},
             account_id INTEGER,
+            conversation_id TEXT,
+            report_content TEXT,
+            summary TEXT,
+            risk_assessment TEXT,
             created_at TEXT,
-            summary TEXT
+            generated_by TEXT,
+            metadata TEXT
+        )
+    """)
+
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            audit_id {pk_type},
+            timestamp TEXT,
+            agent_name TEXT,
+            tool_name TEXT,
+            action TEXT,
+            decision TEXT,
+            reason TEXT,
+            policy_version TEXT,
+            risk_score REAL,
+            execution_time REAL,
+            status TEXT,
+            metadata TEXT
+        )
+    """)
+
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS conversations (
+            conversation_id {pk_type},
+            user_message TEXT,
+            assistant_response TEXT,
+            created_at TEXT,
+            status TEXT,
+            session_id TEXT
+        )
+    """)
+
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS tool_executions (
+            execution_id {pk_type},
+            conversation_id TEXT,
+            tool_name TEXT,
+            allowed INTEGER,
+            blocked INTEGER,
+            reason TEXT,
+            risk_score REAL,
+            policy_version TEXT,
+            duration REAL,
+            timestamp TEXT
+        )
+    """)
+
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS hitl_requests (
+            request_id {pk_type},
+            conversation_id TEXT,
+            tool_name TEXT,
+            risk_score REAL,
+            threshold REAL,
+            status TEXT,
+            approved_by TEXT,
+            approval_time TEXT,
+            created_at TEXT,
+            reason TEXT
+        )
+    """)
+
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS governance_events (
+            event_id {pk_type},
+            conversation_id TEXT,
+            event_type TEXT,
+            description TEXT,
+            agent TEXT,
+            policy_version TEXT,
+            created_at TEXT,
+            metadata TEXT
+        )
+    """)
+
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS governance_versions (
+            version_id {pk_type},
+            version_number INTEGER,
+            git_commit_sha TEXT,
+            git_branch TEXT,
+            policy_hash TEXT,
+            agent_hash TEXT,
+            governance_hash TEXT,
+            change_summary TEXT,
+            created_at TEXT,
+            created_by TEXT,
+            deployment_status TEXT,
+            is_active INTEGER,
+            rolled_back_from INTEGER,
+            rollback_timestamp TEXT,
+            metadata TEXT
         )
     """)
 

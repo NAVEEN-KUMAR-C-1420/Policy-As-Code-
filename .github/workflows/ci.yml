@@ -25,9 +25,30 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Run CI Verification Framework
+    - name: Compile check
       run: |
-        python scripts/verify_project.py
+        python -m compileall .
+
+    - name: Initialize Test Database
+      env:
+        DATABASE_PROVIDER: sqlite
+      run: |
+        python data/init_db.py
+
+    - name: API Testing
+      env:
+        DATABASE_PROVIDER: sqlite
+        GROQ_API_KEY: "dummy_key_for_tests"
+        TAVILY_API_KEY: "dummy_key_for_tests"
+      run: |
+        python -m pytest api_testing/ -v --junitxml=test-results/api-test-results.xml
+
+    - name: Governance Testing
+      env:
+        DATABASE_PROVIDER: sqlite
+        GROQ_API_KEY: "dummy_key_for_tests"
+      run: |
+        python test_governance.py
 
     - name: Upload test results
       uses: actions/upload-artifact@v4

@@ -32,7 +32,7 @@ EXPOSE 8000
 
 # Health check endpoint
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://172.0.0.1:8000/health || exit 1
 
 # Production WSGI/ASGI runner using Gunicorn + Uvicorn Workers
 CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000", "api.main:app"]

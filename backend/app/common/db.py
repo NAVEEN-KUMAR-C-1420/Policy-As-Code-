@@ -110,7 +110,16 @@ def run_write(sql, params=()):
         connection = sqlite3.connect(DB_PATH)
         cursor = connection.cursor()
         cursor.execute(sql, params)
+        
+        # If the statement uses RETURNING, we must fetch the result to clear the statement state,
+        # otherwise sqlite3 raises 'cannot commit transaction - SQL statements in progress'.
+        last_id = 0
+        if "RETURNING" in sql.upper():
+            row = cursor.fetchone()
+            if row:
+                last_id = row[0]
+                
         connection.commit()
-        last_row_id = cursor.lastrowid
+        last_row_id = last_id if last_id else cursor.lastrowid
         connection.close()
         return last_row_id

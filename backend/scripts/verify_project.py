@@ -31,8 +31,9 @@ if hasattr(sys.stdout, "reconfigure"):
         pass
 
 # Add to path for imports
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+APP_DIR = PROJECT_ROOT / "app"
+if str(APP_DIR) not in sys.path:
+    sys.path.insert(0, str(APP_DIR))
 
 
 def print_header(title):
@@ -48,19 +49,19 @@ def verify_structure():
 
     # Required directories
     required_dirs = [
-        "agents",
-        "api",
-        "common",
-        "config",
-        "core",
+        "app/agents",
+        "app/api",
+        "app/common",
+        "app/config",
+        "app/core",
         "data",
-        "middleware",
-        "orchestrator",
+        "app/middleware",
+        "app/orchestrator",
         "scripts",
         "tests",
-        "agents/data_collector_agent",
-        "agents/risk_analyzer_agent",
-        "agents/report_writer_agent",
+        "app/agents/data_collector_agent",
+        "app/agents/risk_analyzer_agent",
+        "app/agents/report_writer_agent",
     ]
     for d in required_dirs:
         if not (PROJECT_ROOT / d).is_dir():
@@ -73,10 +74,10 @@ def verify_structure():
         "requirements.txt",
         "pyproject.toml",
         ".env.example",
-        "config/providers.yaml",
-        "core/paths.py",
-        "core/__init__.py",
-        "api/main.py",
+        "app/config/providers.yaml",
+        "app/core/paths.py",
+        "app/core/__init__.py",
+        "app/api/main.py",
         "data/init_db.py",
         "tests/conftest.py",
         "tests/run_all_tests.py",
@@ -91,9 +92,9 @@ def verify_structure():
     # Agent structure
     for agent in ["data_collector_agent", "risk_analyzer_agent", "report_writer_agent"]:
         for required in ["agent.yaml", "policy.yaml"]:
-            path = PROJECT_ROOT / "agents" / agent / required
+            path = PROJECT_ROOT / "app" / "agents" / agent / required
             if not path.is_file():
-                errors.append(f"Missing: agents/{agent}/{required}")
+                errors.append(f"Missing: app/agents/{agent}/{required}")
 
     if errors:
         for e in errors:
@@ -155,8 +156,8 @@ def verify_policies():
     all_valid = True
 
     for agent in agents:
-        policy_path = PROJECT_ROOT / "agents" / agent / "policy.yaml"
-        agent_path = PROJECT_ROOT / "agents" / agent / "agent.yaml"
+        policy_path = PROJECT_ROOT / "app" / "agents" / agent / "policy.yaml"
+        agent_path = PROJECT_ROOT / "app" / "agents" / agent / "agent.yaml"
 
         for fpath, label in [(policy_path, "policy.yaml"), (agent_path, "agent.yaml")]:
             if fpath.exists():

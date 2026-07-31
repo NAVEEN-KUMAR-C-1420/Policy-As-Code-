@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aivar-backend-prod
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_PROVIDER=${DATABASE_PROVIDER:-sqlite}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+    volumes:
+      - backend-data:/app/data
+      - backend-logs:/app/logs
+      - ./backend/manifest.json:/app/manifest.json:ro
+    networks:
+      - aivar-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aivar-frontend-prod
+    restart: always
+    ports:
+      - "80:80"
+    networks:
+      - aivar-network
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+networks:
+  aivar-network:
+    driver: bridge
+
+volumes:
+  backend-data:
+  backend-logs:

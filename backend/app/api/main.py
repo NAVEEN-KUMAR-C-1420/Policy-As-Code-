@@ -1,4 +1,11 @@
 import os
+import sys
+from pathlib import Path
+
+# Ensure app directory is in sys.path so modules like `api` and `middleware` can be imported
+app_dir = Path(__file__).resolve().parent.parent
+if str(app_dir) not in sys.path:
+    sys.path.insert(0, str(app_dir))
 
 from dotenv import load_dotenv
 
@@ -32,10 +39,16 @@ from api.routers import (
     versions,
 )
 from api.services.version_service import check_and_create_version_on_startup
-
+from middleware.code_integrity import run_startup_integrity_check, IntegrityEnforcementMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Run integrity check on startup
+    try:
+        run_startup_integrity_check()
+    except Exception as e:
+        logging.error(f"Failed to run startup integrity check: {e}")
+        
     # Run version check on startup
     try:
         check_and_create_version_on_startup()
@@ -52,7 +65,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-
 @app.get("/")
 def root():
     return {"message": "Welcome to the Finance Multi-Agent Governance API","Swagger UI": "/docs"}
@@ -65,6 +77,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add Global Integrity Enforcement Middleware
+app.add_middleware(IntegrityEnforcementMiddleware)
 
 
 # Exception handler to standardize response schemas

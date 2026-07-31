@@ -1,0 +1,31 @@
+{
+  "version": "1.0",
+  "commit_id": "local-dev",
+  "timestamp": "2026-07-31T04:14:49.785556+00:00",
+  "yaml_hashes": {
+    "agents/data_collector_agent/agent.yaml": "b393e7789a4b97693b9d5044d0c063c2de2e5c9a8e00714ecabff1bc4fe4495d",
+    "agents/data_collector_agent/policy.yaml": "a620f7e9bb46dff8a5492811f9aea074e1066721688ca3388bc30d065000a73b",
+    "agents/master_agent/agent.yaml": "065c0b3a25105e960871ffac170a9a1fb9a96abeec8c800e9c786cadfa9ae3a9",
+    "agents/master_agent/policy.yaml": "5cb9310a9510668f129fe1d9705a785e77c949272d15f71e7bf272f1fa2fd572",
+    "agents/report_writer_agent/agent.yaml": "0cd1f9b36cc93d150daefc905e1f215a959f97f4946a2015906e87f1a58f423b",
+    "agents/report_writer_agent/policy.yaml": "39e8e564a3f4268ba9030541c9c2d30feefc4abf43b8a1e7ef0b863bd87a73ee",
+    "agents/risk_analyzer_agent/agent.yaml": "ce3397ac3f6cfeab62075f83bf7a63ed10f90cca72c98337850f76827d4a01f8",
+    "agents/risk_analyzer_agent/policy.yaml": "b3df9b94d55421a0b673ac2fb795c0231b3a028b3b3b38f6a97efadee86aad5e",
+    "config/providers.yaml": "956b5efcc21e134d0522dd81339ef6ce998652e931412118414963e7dd8adf09"
+  },
+  "combined_hash": "6059defd011d468eda62c216ab3da09707e0b6d935b1541be4c8f23cfe7b9490",
+  "validated_files": [
+    "agents/data_collector_agent/agent.yaml",
+    "agents/data_collector_agent/policy.yaml",
+    "agents/master_agent/agent.yaml",
+    "agents/master_agent/policy.yaml",
+    "agents/report_writer_agent/agent.yaml",
+    "agents/report_writer_agent/policy.yaml",
+    "agents/risk_analyzer_agent/agent.yaml",
+    "agents/risk_analyzer_agent/policy.yaml",
+    "config/providers.yaml"
+  ],
+  "build_number": "local-1",
+  "branch": "local-branch",
+  "validation_status": "PASSED"
+}

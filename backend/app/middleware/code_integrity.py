@@ -1,25 +1,40 @@
 """
 Code Integrity & Safe Mode Engine
 =================================
-Computes runtime SHA256 hashes of agent code, agent configs, and policy YAMLs.
-Compares runtime hashes against the active governance version in the database.
+Reads the deployed manifest.json and compares canonical hashes
+of deployed YAML files to ensure runtime integrity.
 
-If a file has been tampered with or modified without creating a new governance version:
+If a file has been tampered with:
   - System enters SAFE MODE
   - Pipeline execution is BLOCKED
-  - Governance event & Audit log entry are created
+  - Drift Detected is raised
   - Frontend displays Integrity Failed alert with detailed diagnostic information.
 """
 
 import hashlib
+import json
 import os
 import sys
 from pathlib import Path
 from typing import Any
 
-from common.repositories import AuditRepository, GovernanceRepository, GovernanceVersionRepository
 from core.paths import AGENTS_DIR, MIDDLEWARE_DIR
 from core.paths import BASE_DIR as PROJECT_ROOT
+
+from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi import Request
+from fastapi.responses import JSONResponse
+import logging
+
+_STARTUP_INTEGRITY_CACHE = None
+
+# Import our new canonical yaml hasher (needs to be available in path)
+try:
+    from scripts.utils.yaml_canonicalizer import get_yaml_hash
+except ImportError:
+    # Fallback if running from a different context
+    sys.path.insert(0, str(PROJECT_ROOT.parent))
+    from scripts.utils.yaml_canonicalizer import get_yaml_hash
 
 _SAFE_MODE_OVERRIDE = False
 
@@ -30,61 +45,31 @@ def set_safe_mode_override(enabled: bool):
     _SAFE_MODE_OVERRIDE = enabled
 
 
-def compute_runtime_integrity_hashes() -> dict[str, str]:
-    """Generates SHA256 hashes for all governed system files."""
-    policy_hasher = hashlib.sha256()
-    agent_hasher = hashlib.sha256()
-    governance_hasher = hashlib.sha256()
-
-    # Hash agent policy.yaml, agent.yaml, and python tools/agents
-    if AGENTS_DIR.exists():
-        for root, _, files in os.walk(AGENTS_DIR):
-            for file in sorted(files):
-                filepath = Path(root) / file
-                if file == "policy.yaml":
-                    with open(filepath, "rb") as f:
-                        policy_hasher.update(f.read())
-                elif file == "agent.yaml" or file.endswith(".py"):
-                    with open(filepath, "rb") as f:
-                        agent_hasher.update(f.read())
-
-    # Hash middleware governance files
-    if MIDDLEWARE_DIR.exists():
-        for root, _, files in os.walk(MIDDLEWARE_DIR):
-            for file in sorted(files):
-                if file.endswith(".py"):
-                    filepath = Path(root) / file
-                    with open(filepath, "rb") as f:
-                        governance_hasher.update(f.read())
-
-    return {
-        "policy_hash": policy_hasher.hexdigest(),
-        "agent_hash": agent_hasher.hexdigest(),
-        "governance_hash": governance_hasher.hexdigest(),
-    }
+def load_manifest() -> dict:
+    """Loads the immutable manifest generated during CI/CD."""
+    manifest_path = PROJECT_ROOT.parent / "manifest.json"
+    if not manifest_path.exists():
+        return None
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def verify_system_integrity() -> dict[str, Any]:
     """
-    Verifies runtime hashes against active version in DB.
+    Verifies runtime hashes against the local manifest.json.
     Returns integrity status dict.
     """
     global _SAFE_MODE_OVERRIDE
 
-    runtime_hashes = compute_runtime_integrity_hashes()
-    active_version = GovernanceVersionRepository.get_active_version()
+    manifest = load_manifest()
+    
+    # We still fetch git commit for diagnostic purposes, though manifest has it.
     git_commit = "head"
-
     try:
         import subprocess
-
-        git_commit = (
-            subprocess.check_output(
-                ["git", "rev-parse", "--short", "HEAD"], cwd=str(PROJECT_ROOT), stderr=subprocess.DEVNULL
-            )
-            .decode()
-            .strip()
-        )
+        git_commit = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=str(PROJECT_ROOT), stderr=subprocess.DEVNULL
+        ).decode().strip()
     except Exception:
         pass
 
@@ -93,36 +78,66 @@ def verify_system_integrity() -> dict[str, Any]:
             "status": "FAILED",
             "safe_mode": True,
             "reason": "Safe Mode manually simulated via Developer Settings for demonstration.",
-            "policy_hash": runtime_hashes["policy_hash"],
-            "agent_hash": runtime_hashes["agent_hash"],
-            "governance_hash": runtime_hashes["governance_hash"],
-            "expected_hash": "SIMULATED_MISMATCH_HASH",
+            "mismatches": ["SIMULATED"],
             "commit_sha": git_commit,
-            "deployment_version": active_version.get("version_number", 1) if active_version else 1,
-            "required_action": "Disable Safe Mode simulation in Developer Settings or create a new governance version.",
+            "deployment_version": manifest.get("version", "1") if manifest else "1",
+            "required_action": "Disable Safe Mode simulation in Developer Settings.",
         }
 
-    if not active_version:
-        # No version record yet - system is initial state
+    if not manifest:
+        # If there is no manifest, we assume local dev or a system that hasn't been through the CI pipeline.
         return {
             "status": "PASSED",
             "safe_mode": False,
-            "reason": "System initialized cleanly.",
-            "policy_hash": runtime_hashes["policy_hash"],
-            "agent_hash": runtime_hashes["agent_hash"],
-            "governance_hash": runtime_hashes["governance_hash"],
+            "reason": "No manifest.json found. Bypassing strict runtime integrity.",
             "commit_sha": git_commit,
-            "deployment_version": 1,
+            "deployment_version": "dev",
             "required_action": "None",
         }
 
+    if manifest.get("validation_status") != "PASSED":
+        return {
+            "status": "FAILED",
+            "safe_mode": True,
+            "reason": "Manifest indicates governance validation failed during CI/CD.",
+            "mismatches": ["manifest.validation_status != PASSED"],
+            "commit_sha": git_commit,
+            "deployment_version": manifest.get("version", "unknown"),
+            "required_action": "Do not deploy builds that fail governance validation.",
+        }
+
+    expected_hashes = manifest.get("yaml_hashes", {})
     mismatches = []
-    if active_version.get("policy_hash") and active_version["policy_hash"] != runtime_hashes["policy_hash"]:
-        mismatches.append("policy.yaml files modified without version bump")
-    if active_version.get("agent_hash") and active_version["agent_hash"] != runtime_hashes["agent_hash"]:
-        mismatches.append("agent code or agent.yaml modified without version bump")
-    if active_version.get("governance_hash") and active_version["governance_hash"] != runtime_hashes["governance_hash"]:
-        mismatches.append("governance middleware modified without version bump")
+    
+    # Check all files that were validated and hashed in the manifest
+    for rel_path, expected_hash in expected_hashes.items():
+        full_path = PROJECT_ROOT / rel_path
+        if full_path.exists():
+            try:
+                # Use canonical yaml hash
+                actual_hash = get_yaml_hash(full_path)
+                if actual_hash != expected_hash:
+                    mismatches.append(f"Drift detected in {rel_path}: actual hash {actual_hash[:8]} != expected {expected_hash[:8]}")
+            except Exception as e:
+                mismatches.append(f"Error hashing {rel_path}: {e}")
+        else:
+            mismatches.append(f"Missing governed file: {rel_path}")
+
+    # Recompute combined hash for overall integrity
+    runtime_yaml_hashes = []
+    for rel_path in expected_hashes.keys():
+        full_path = PROJECT_ROOT / rel_path
+        if full_path.exists():
+            try:
+                runtime_yaml_hashes.append(get_yaml_hash(full_path))
+            except Exception:
+                pass
+    
+    runtime_combined = "".join(sorted(runtime_yaml_hashes))
+    actual_combined_hash = hashlib.sha256(runtime_combined.encode('utf-8')).hexdigest()
+    
+    if actual_combined_hash != manifest.get("combined_hash") and not mismatches:
+        mismatches.append("Combined hash mismatch indicating overall configuration drift.")
 
     if mismatches:
         reason_str = "; ".join(mismatches)
@@ -130,25 +145,58 @@ def verify_system_integrity() -> dict[str, Any]:
             "status": "FAILED",
             "safe_mode": True,
             "reason": f"Integrity check failed: {reason_str}",
-            "policy_hash": runtime_hashes["policy_hash"],
-            "agent_hash": runtime_hashes["agent_hash"],
-            "governance_hash": runtime_hashes["governance_hash"],
-            "expected_policy_hash": active_version.get("policy_hash"),
-            "expected_agent_hash": active_version.get("agent_hash"),
-            "expected_governance_hash": active_version.get("governance_hash"),
+            "mismatches": mismatches,
             "commit_sha": git_commit,
-            "deployment_version": active_version.get("version_number"),
-            "required_action": "Create a new Governance Version via API/CLI or revert uncommitted code changes.",
+            "deployment_version": manifest.get("version", "unknown"),
+            "required_action": "Revert uncommitted code changes or re-run deployment pipeline.",
         }
 
     return {
         "status": "PASSED",
         "safe_mode": False,
-        "reason": "All runtime SHA256 hashes match active governance version.",
-        "policy_hash": runtime_hashes["policy_hash"],
-        "agent_hash": runtime_hashes["agent_hash"],
-        "governance_hash": runtime_hashes["governance_hash"],
+        "reason": "All runtime hashes match the deployed manifest.",
         "commit_sha": git_commit,
-        "deployment_version": active_version.get("version_number", 1),
+        "deployment_version": manifest.get("version", "unknown"),
         "required_action": "None",
     }
+
+def run_startup_integrity_check():
+    """Runs the integrity check on startup and caches the result globally."""
+    global _STARTUP_INTEGRITY_CACHE
+    _STARTUP_INTEGRITY_CACHE = verify_system_integrity()
+    if _STARTUP_INTEGRITY_CACHE.get("safe_mode"):
+        logging.critical(
+            f"CRITICAL: Code Integrity Verification Failed during startup! "
+            f"System is entering SAFE MODE. Reason: {_STARTUP_INTEGRITY_CACHE.get('reason')}"
+        )
+    else:
+        logging.info("Code Integrity Verification Passed on startup.")
+
+class IntegrityEnforcementMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware that blocks execution routes if the system is in safe mode.
+    Diagnostic endpoints remain accessible.
+    """
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        
+        # We only block execution endpoints. We allow /docs, /health, /integrity, etc.
+        if path.startswith("/agents") or path.startswith("/pipeline"):
+            
+            if _SAFE_MODE_OVERRIDE:
+                integrity = verify_system_integrity()
+            else:
+                integrity = _STARTUP_INTEGRITY_CACHE or verify_system_integrity()
+                
+            if integrity.get("safe_mode"):
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "success": False, 
+                        "message": "System is in SAFE MODE due to integrity violation. Execution blocked.",
+                        "reason": integrity.get("reason", "Unknown integrity failure"),
+                        "mismatches": integrity.get("mismatches", [])
+                    }
+                )
+                
+        return await call_next(request)

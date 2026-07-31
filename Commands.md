@@ -19,8 +19,8 @@ pip install -r requirements.txt
 
 python scripts/verify_project.py
 python tests/run_all_tests.py
-python -c "from api.main import app; print('Backend Import Successful')"
-uvicorn api.main:app --reload
+python -c "import sys; sys.path.insert(0, 'app'); from api.main import app; print('Backend Import Successful')"
+uvicorn app.api.main:app --reload
 
  ## Open
 
@@ -66,3 +66,52 @@ uvicorn api.main:app --reload
 
 cd frontend
 npm run dev
+
+## End points 
+
+HTTP Method: GET
+
+Complete Endpoint Path: /policies/{agent_id}/versions/{commit_sha}
+
+Request Parameters:
+agent_id (path parameter, string): ID of the agent (e.g. data_collector_agent, master_agent).
+commit_sha (path parameter, string): Git commit SHA (e.g. HEAD, a1b2c3d4) or database release SHA (local_sqlite_head).
+
+## Sample curl Request:
+
+bash
+curl -X GET "http://127.0.0.1:8000/policies/data_collector_agent/versions/HEAD"
+
+## Sample Response 
+
+{
+  "success": true,
+  "message": "Success",
+  "data": {
+    "metadata": {
+      "agent_id": "data_collector_agent",
+      "commit_sha": "HEAD",
+      "policy_hash": "83d5acdbfc579bd4c74047ab82438c024a2cd355771de3377304de9719c2b16c",
+      "deployed_at": null,
+      "deployed_by": "git_history",
+      "deployment_source": "git",
+      "is_active": 0,
+      "notes": "Retrieved from Git history"
+    },
+    "policy_yaml": "agent_id: data_collector_agent\npolicy_version: \"1.0\"...",
+    "source": "git"
+  },
+  "errors": null
+}
+
+
+## To deploy a new version of an agent's policy:
+
+bash
+curl -X POST "http://127.0.0.1:8000/policies/deploy" \
+-H "Content-Type: application/json" \
+-d '{
+  "agent_id": "data_collector_agent",
+  "policy_yaml": "# Deployment content goes here...",
+  "commit_message": "Initial deployment"
+}'

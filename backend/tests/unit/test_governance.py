@@ -517,12 +517,26 @@ def test_18_real_agent_compat():
 
 def test_19_delete_blocked():
     reset_call_counters()
-    from agents.report_writer_agent.dev.tools import guarded_delete_old_reports
+    
+    # We pass agent_id="report_writer_agent" which has a policy that denies 'delete' scope tools.
+    # Let's load that policy.
+    from middleware.policy_loader import load_policy
+    from core.paths import AGENTS_DIR
+    policy = load_policy(AGENTS_DIR / "report_writer_agent" / "policy.yaml")
+
+    def _dummy_blocked_tool(account_id: int) -> str:
+        return "This should not run."
+
+    guarded_delete_old_reports = guard_tool(
+        tool_name="delete_old_reports",
+        policy=policy,
+        agent_id="report_writer_agent",
+        original_function=_dummy_blocked_tool
+    )
 
     result = guarded_delete_old_reports(account_id=101)
     assert "BLOCKED" in result, f"delete_old_reports should be BLOCKED: {result}"
     print("  PASS: TEST 19 - delete_old_reports is blocked (defense in depth)")
-
 
 # ================================================================
 # TEST 20: Policy validator catches HITL threshold out of range
@@ -565,7 +579,8 @@ def test_22_data_retention():
         print("  SKIP: TEST 22 - Data retention functions (SQLite only)")
         return
 
-    db_path = PROJECT_ROOT / "data" / "finance.db"
+    from core.paths import DATA_DIR
+    db_path = DATA_DIR / "finance.db"
     # With retention of 9999 days, nothing should be expired
     expired = find_expired_reports(db_path, retention_days=9999)
     assert isinstance(expired, list)
@@ -598,7 +613,8 @@ def test_24_db_integrity():
         print("  SKIP: TEST 24 - Database integrity verified (SQLite only)")
         return
 
-    db_path = PROJECT_ROOT / "data" / "finance.db"
+    from core.paths import DATA_DIR
+    db_path = DATA_DIR / "finance.db"
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("PRAGMA integrity_check")

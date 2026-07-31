@@ -21,6 +21,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import sys
+from pathlib import Path
+
+# Add backend/app to sys.path
+APP_DIR = Path(__file__).resolve().parent.parent / "app"
+if str(APP_DIR) not in sys.path:
+    sys.path.insert(0, str(APP_DIR))
+
 from core.paths import DATA_DIR
 
 DB_PATH = DATA_DIR / "finance.db"

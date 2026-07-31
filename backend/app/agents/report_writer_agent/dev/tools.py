@@ -61,34 +61,12 @@ def _write_report_file(account_id: int, content: str) -> str:
     ReportRepository.save_report_content(account_id, content, generated_by=AGENT_ID)
     return f"Report saved to database for account {account_id}."
 
-def _delete_old_reports(account_id: int) -> str:
-    """Delete all saved reports for an account. Governed by policy."""
-    run_write("DELETE FROM reports WHERE account_id = ?", (account_id,))
-    return f"All reports deleted for account {account_id}."
-
-def _send_investor_email(email_address: str, content: str) -> str:
-    """Send an email to an investor with financial data."""
-    return f"Successfully sent email to {email_address}."
-
-def _export_database(format: str) -> str:
-    """Export the entire database to a file."""
-    return f"Database exported successfully in {format} format."
-
-def _access_sensitive_data(query: str) -> str:
-    """Query highly sensitive internal data bypassing normal filters."""
-    return f"Sensitive data retrieved for query: {query}"
-
-
 # ------------------------------------------------------------------
 # Step 2: wrap each function with the governance guard
 # ------------------------------------------------------------------
 
 guarded_save_to_db = guard_tool(tool_name="save_report_to_db", policy=policy, agent_id=AGENT_ID, original_function=_save_report_to_db)
 guarded_write_file = guard_tool(tool_name="write_report_file", policy=policy, agent_id=AGENT_ID, original_function=_write_report_file)
-guarded_delete_old_reports = guard_tool(tool_name="delete_old_reports", policy=policy, agent_id=AGENT_ID, original_function=_delete_old_reports)
-guarded_send_investor_email = guard_tool(tool_name="send_investor_email", policy=policy, agent_id=AGENT_ID, original_function=_send_investor_email)
-guarded_export_database = guard_tool(tool_name="export_database", policy=policy, agent_id=AGENT_ID, original_function=_export_database)
-guarded_access_sensitive_data = guard_tool(tool_name="access_sensitive_data", policy=policy, agent_id=AGENT_ID, original_function=_access_sensitive_data)
 
 
 # ------------------------------------------------------------------
@@ -100,8 +78,4 @@ def get_tools():
     return [
         StructuredTool.from_function(func=guarded_save_to_db, name="save_report_to_db", description="Save a report summary (string) to the database for a given account_id (integer)."),
         StructuredTool.from_function(func=guarded_write_file, name="write_report_file", description="Write the full report content (string) to a markdown file for a given account_id (integer)."),
-        StructuredTool.from_function(func=guarded_delete_old_reports, name="delete_old_reports", description="Delete all historical reports for a given account_id (integer)."),
-        StructuredTool.from_function(func=guarded_send_investor_email, name="send_investor_email", description="Send an email to an investor with financial data (email_address, content)."),
-        StructuredTool.from_function(func=guarded_export_database, name="export_database", description="Export the entire database to a file (format: str)."),
-        StructuredTool.from_function(func=guarded_access_sensitive_data, name="access_sensitive_data", description="Query highly sensitive internal data bypassing normal filters (query: str)."),
     ]

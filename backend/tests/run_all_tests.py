@@ -34,8 +34,10 @@ PROJECT_ROOT = SCRIPT_DIR.parent
 # Ensure backend is in PYTHONPATH for subprocess calls
 env = os.environ.copy()
 existing_pythonpath = env.get("PYTHONPATH", "")
-if str(PROJECT_ROOT) not in existing_pythonpath:
-    env["PYTHONPATH"] = str(PROJECT_ROOT) + os.pathsep + existing_pythonpath
+app_path = str(PROJECT_ROOT / "app")
+project_path = str(PROJECT_ROOT)
+if app_path not in existing_pythonpath:
+    env["PYTHONPATH"] = app_path + os.pathsep + project_path + os.pathsep + existing_pythonpath
 
 # Force test-safe environment
 env.setdefault("DATABASE_PROVIDER", "sqlite")

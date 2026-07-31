@@ -60,11 +60,35 @@ def get_historical_policy(agent_id: str, commit_sha: str) -> dict:
         "SELECT * FROM policy_versions WHERE agent_id = ? AND commit_sha = ? ORDER BY version_id DESC LIMIT 1",
         (agent_id, commit_sha),
     )
-    if not rows:
-        raise ValueError(f"Version {commit_sha} not found for agent {agent_id}")
-    row = dict(rows[0])
-    policy_yaml = row.pop("policy_yaml")
-    return {"metadata": row, "policy_yaml": policy_yaml}
+    if rows:
+        row = dict(rows[0])
+        policy_yaml = row.pop("policy_yaml")
+        return {"metadata": row, "policy_yaml": policy_yaml, "source": "database"}
+
+    # Fallback: Retrieve directly from Git history if commit SHA exists in git repository
+    for rel_path in [f"app/agents/{agent_id}/policy.yaml", f"agents/{agent_id}/policy.yaml", f"backend/app/agents/{agent_id}/policy.yaml"]:
+        try:
+            policy_yaml = subprocess.check_output(
+                ["git", "show", f"{commit_sha}:{rel_path}"],
+                cwd=PROJECT_ROOT,
+                stderr=subprocess.DEVNULL,
+            ).decode("utf-8")
+            policy_hash = hashlib.sha256(policy_yaml.encode("utf-8")).hexdigest()
+            metadata = {
+                "agent_id": agent_id,
+                "commit_sha": commit_sha,
+                "policy_hash": policy_hash,
+                "deployed_at": None,
+                "deployed_by": "git_history",
+                "deployment_source": "git",
+                "is_active": 0,
+                "notes": "Retrieved from Git history",
+            }
+            return {"metadata": metadata, "policy_yaml": policy_yaml, "source": "git"}
+        except Exception:
+            continue
+
+    raise ValueError(f"Version {commit_sha} not found for agent {agent_id}")
 
 
 def rollback_policy(agent_id: str, commit_sha: str) -> dict:

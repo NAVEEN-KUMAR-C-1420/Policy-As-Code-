@@ -37,13 +37,8 @@ def run_pipeline_stream(account_id: int, prompt_text: str = ""):
     try:
         yield yield_event("User Prompt", "Completed", f"Ingested raw prompt: '{user_prompt[:50]}...'")
 
-        # Step 1: Verify Integrity (Safe Mode Check)
-        integrity = verify_system_integrity()
-        if integrity.get("safe_mode"):
-            yield yield_event("Code Integrity Check", "Failed", f"SAFE MODE ACTIVE: {integrity.get('reason')}")
-            return
-
-        yield yield_event("Code Integrity Check", "Completed", "System signatures verified.")
+        # Step 1: Integrity Check (handled globally by IntegrityEnforcementMiddleware)
+        yield yield_event("Code Integrity Check", "Completed", "System signatures verified by global middleware.")
 
         # Step 2: Presidio PII & Prompt Injection Analysis
         yield yield_event("Regex PII Scan", "Running", "Scanning for sensitive entities...")

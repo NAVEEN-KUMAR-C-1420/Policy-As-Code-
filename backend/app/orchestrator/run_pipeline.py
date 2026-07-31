@@ -34,7 +34,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from dotenv import load_dotenv
 
-load_dotenv()  # loads GROQ_API_KEY, TAVILY_API_KEY, etc. from .env
+load_dotenv(override=True)  # loads GROQ_API_KEY, TAVILY_API_KEY, etc. from .env
 
 from agents.data_collector_agent.dev.agent import run as run_data_collector
 from agents.report_writer_agent.dev.agent import run as run_report_writer

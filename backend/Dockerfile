@@ -5,7 +5,9 @@ WORKDIR /app
 # Prevent Python from writing .pyc files and enable unbuffered logging
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app/app
+    PYTHONPATH=/app/app \
+    PIP_DEFAULT_TIMEOUT=300 \
+    PIP_RETRIES=5
 
 # Install system dependencies (curl for healthcheck, git for versioning/manifest checks)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -16,7 +18,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --retries 5 --timeout 300 -r requirements.txt
 
 # Copy application source
 COPY . .

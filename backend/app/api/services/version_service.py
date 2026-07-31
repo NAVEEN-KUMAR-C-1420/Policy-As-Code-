@@ -162,28 +162,46 @@ def generate_system_hashes() -> dict:
 
 def _get_git_info() -> dict:
     """Extract Git metadata safely."""
+    commit_sha = os.getenv("GIT_COMMIT_SHA") or os.getenv("COMMIT_SHA")
+    branch = os.getenv("GIT_BRANCH") or os.getenv("BRANCH")
+    if commit_sha and branch:
+        return {"commit_sha": commit_sha, "branch": branch}
     try:
-        commit_sha = (
-            subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=PROJECT_ROOT, stderr=subprocess.DEVNULL)
-            .decode()
-            .strip()
-        )
-        branch = (
-            subprocess.check_output(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=PROJECT_ROOT, stderr=subprocess.DEVNULL
+        if not commit_sha:
+            commit_sha = (
+                subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=PROJECT_ROOT, stderr=subprocess.DEVNULL)
+                .decode()
+                .strip()
             )
-            .decode()
-            .strip()
-        )
+        if not branch:
+            branch = (
+                subprocess.check_output(
+                    ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=PROJECT_ROOT, stderr=subprocess.DEVNULL
+                )
+                .decode()
+                .strip()
+            )
         return {"commit_sha": commit_sha, "branch": branch}
     except Exception:
-        return {"commit_sha": None, "branch": None}
+        return {"commit_sha": commit_sha or "local_head", "branch": branch or "main"}
 
 
 def check_and_create_version_on_startup(change_summary: str = "System startup detected changes in governed files", metadata: dict = None):
     """Checks if the tracked files have changed since the active version, and increments a new version if so."""
-    active_version = GovernanceVersionRepository.get_active_version()
     current_hashes = generate_system_hashes()
+
+    # 1. Check if ANY version matching these exact hashes already exists (e.g. created by another worker process)
+    matching_existing = GovernanceVersionRepository.get_by_hashes(
+        current_hashes["policy_hash"],
+        current_hashes["agent_hash"],
+        current_hashes["governance_hash"],
+    )
+    if matching_existing:
+        if not matching_existing.get("is_active"):
+            GovernanceVersionRepository.set_active_version(matching_existing["version_number"])
+        return
+
+    active_version = GovernanceVersionRepository.get_active_version()
 
     # If no changes and an active version exists, do nothing.
     if active_version:

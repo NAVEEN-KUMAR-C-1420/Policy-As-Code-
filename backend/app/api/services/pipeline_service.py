@@ -43,8 +43,8 @@ def run_pipeline_stream(account_id: int, prompt_text: str = ""):
         # Step 2: Presidio PII & Prompt Injection Analysis
         yield yield_event("Regex PII Scan", "Running", "Scanning for sensitive entities...")
         presidio_res = analyze_pii(user_prompt)
-        yield yield_event("Regex PII Scan", "Completed" if presidio_res["has_pii"] else "Skipped", 
-                         f"Found {len(presidio_res['detected_entities'])} entities. Redacted: {presidio_res['redacted_text'][:50]}..." if presidio_res["has_pii"] else "No PII detected.", payload=presidio_res)
+        yield yield_event("Regex PII Scan", "Completed", 
+                         f"Found {len(presidio_res['detected_entities'])} entities. Redacted: {presidio_res['redacted_text'][:50]}..." if presidio_res["has_pii"] else "No PII detected. Clean prompt.", payload=presidio_res)
 
         yield yield_event("Prompt Injection Detection", "Running", "Checking prompt guardrails...")
         injection_res = detect_prompt_injection(user_prompt)

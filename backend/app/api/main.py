@@ -9,7 +9,7 @@ if str(app_dir) not in sys.path:
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 import logging
 from contextlib import asynccontextmanager

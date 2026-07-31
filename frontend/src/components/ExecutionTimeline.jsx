@@ -26,11 +26,16 @@ export default function ExecutionTimeline({ timeline = [], isExecuting = false }
     switch (status) {
       case 'Completed':
         return <span className="flex items-center gap-1 text-emerald-400 text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20"><CheckCircle2 className="w-3.5 h-3.5" /> Completed</span>;
+      case 'Skipped':
+        return <span className="flex items-center gap-1 text-emerald-400 text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20"><CheckCircle2 className="w-3.5 h-3.5" /> Clean (0 PII)</span>;
       case 'Running':
         return <span className="flex items-center gap-1 text-blue-400 text-xs font-semibold px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 animate-pulse"><Clock className="w-3.5 h-3.5 animate-spin" /> Running</span>;
+      case 'approval_required':
+      case 'Approval Required':
+        return <span className="flex items-center gap-1 text-amber-400 text-xs font-semibold px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 animate-pulse"><AlertCircle className="w-3.5 h-3.5" /> Awaiting Approval</span>;
       case 'Failed':
       case 'Blocked':
-        return <span className="flex items-center gap-1 text-red-400 text-xs font-semibold px-2 py-0.5 rounded bg-red-500/10 border border-red-500/20"><AlertCircle className="w-3.5 h-3.5" /> Failed</span>;
+        return <span className="flex items-center gap-1 text-red-400 text-xs font-semibold px-2 py-0.5 rounded bg-red-500/10 border border-red-500/20"><AlertCircle className="w-3.5 h-3.5" /> Blocked</span>;
       case 'Warning':
         return <span className="flex items-center gap-1 text-amber-400 text-xs font-semibold px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20"><AlertCircle className="w-3.5 h-3.5" /> Warning</span>;
       default:
@@ -60,7 +65,7 @@ export default function ExecutionTimeline({ timeline = [], isExecuting = false }
       <div className="relative pl-6 space-y-4 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-gradient-to-b before:from-blue-500 before:via-indigo-500 before:to-emerald-500">
         {stagesToDisplay.map((item, idx) => {
           const isExpanded = expandedIndex === idx;
-          const isCompleted = item.status === 'Completed';
+          const isCompleted = item.status === 'Completed' || item.status === 'Skipped';
 
           return (
             <div key={idx} className="relative group">
@@ -70,6 +75,8 @@ export default function ExecutionTimeline({ timeline = [], isExecuting = false }
                   ? 'bg-emerald-950 border-emerald-500 text-emerald-400 shadow-md shadow-emerald-500/20' 
                   : item.status === 'Running'
                   ? 'bg-blue-950 border-blue-500 text-blue-400 animate-pulse'
+                  : item.status === 'approval_required' || item.status === 'Approval Required'
+                  ? 'bg-amber-950 border-amber-500 text-amber-400 animate-pulse'
                   : item.status === 'Failed' || item.status === 'Blocked'
                   ? 'bg-red-950 border-red-500 text-red-400'
                   : 'bg-slate-900 border-slate-700 text-slate-500'

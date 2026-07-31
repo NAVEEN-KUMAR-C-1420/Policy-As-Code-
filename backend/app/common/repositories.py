@@ -164,8 +164,15 @@ class GovernanceVersionRepository:
 
     @staticmethod
     def get_all_versions() -> list:
-        rows = run_query("SELECT * FROM governance_versions ORDER BY version_number DESC", ())
-        return [GovernanceVersionRepository._parse_row(dict(r)) for r in rows]
+        rows = run_query("SELECT * FROM governance_versions ORDER BY version_number DESC, created_at DESC", ())
+        seen = set()
+        unique_versions = []
+        for r in rows:
+            v_num = r.get("version_number")
+            if v_num not in seen:
+                seen.add(v_num)
+                unique_versions.append(GovernanceVersionRepository._parse_row(dict(r)))
+        return unique_versions
 
     @staticmethod
     def get_version(version_number: int) -> dict:
@@ -177,6 +184,14 @@ class GovernanceVersionRepository:
         rows = run_query(
             "SELECT * FROM governance_versions WHERE git_commit_sha = ? ORDER BY version_number DESC LIMIT 1",
             (commit_sha,),
+        )
+        return GovernanceVersionRepository._parse_row(dict(rows[0])) if rows else None
+
+    @staticmethod
+    def get_by_hashes(policy_hash: str, agent_hash: str, governance_hash: str) -> dict:
+        rows = run_query(
+            "SELECT * FROM governance_versions WHERE policy_hash = ? AND agent_hash = ? AND governance_hash = ? ORDER BY version_number DESC LIMIT 1",
+            (policy_hash, agent_hash, governance_hash),
         )
         return GovernanceVersionRepository._parse_row(dict(rows[0])) if rows else None
 

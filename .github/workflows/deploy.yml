@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+  AWS_REGION: us-east-1
   ECR_BACKEND_REPO: aivar-backend
   ECR_FRONTEND_REPO: aivar-frontend
   ECS_CLUSTER: aivar-governance-cluster
@@ -42,8 +42,8 @@ jobs:
         run: python scripts/governance_validator.py
 
       - name: Configure AWS Credentials (if available)
-        uses: aws-actions/configure-aws-credentials@v4
         if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -84,7 +84,8 @@ jobs:
     needs: build-and-push
     if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment: dev
+    environment:
+      name: Development
     steps:
       - name: Deploy to AWS Dev Environment
         run: |
@@ -97,7 +98,8 @@ jobs:
     needs: deploy-dev
     if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment: staging
+    environment:
+      name: Staging
     steps:
       - name: Deploy to AWS Staging Environment
         run: |
@@ -110,10 +112,19 @@ jobs:
     needs: deploy-staging
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment: production # Requires manual reviewer approval in GitHub Environment settings!
+    environment:
+      name: Production
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy to AWS Production ECS Cluster
         if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}

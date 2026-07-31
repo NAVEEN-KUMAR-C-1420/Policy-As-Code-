@@ -16,6 +16,11 @@ jobs:
   build-and-push:
     name: 1. Validate & Build Container Images
     runs-on: ubuntu-latest
+    # Hoist the secrets check to a job-level env var.
+    # Step-level `if:` cannot access the `secrets` context directly —
+    # using a job env var is the correct GitHub Actions pattern.
+    env:
+      HAS_AWS_CREDS: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -42,7 +47,7 @@ jobs:
         run: python scripts/governance_validator.py
 
       - name: Configure AWS Credentials (if available)
-        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+        if: env.HAS_AWS_CREDS == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -51,7 +56,7 @@ jobs:
 
       - name: Log in to Amazon ECR (if configured)
         id: login-ecr
-        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+        if: env.HAS_AWS_CREDS == 'true'
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Set Image Tag
@@ -65,14 +70,14 @@ jobs:
           docker build -t $ECR_FRONTEND_REPO:$IMAGE_TAG ./frontend
 
       - name: Push Images to Amazon ECR
-        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+        if: env.HAS_AWS_CREDS == 'true'
         run: |
           REGISTRY=${{ steps.login-ecr.outputs.registry }}
           docker tag $ECR_BACKEND_REPO:$IMAGE_TAG $REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG
           docker tag $ECR_BACKEND_REPO:$IMAGE_TAG $REGISTRY/$ECR_BACKEND_REPO:latest
           docker tag $ECR_FRONTEND_REPO:$IMAGE_TAG $REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG
           docker tag $ECR_FRONTEND_REPO:$IMAGE_TAG $REGISTRY/$ECR_FRONTEND_REPO:latest
-          
+
           docker push $REGISTRY/$ECR_BACKEND_REPO:$IMAGE_TAG
           docker push $REGISTRY/$ECR_BACKEND_REPO:latest
           docker push $REGISTRY/$ECR_FRONTEND_REPO:$IMAGE_TAG
@@ -89,7 +94,7 @@ jobs:
     steps:
       - name: Deploy to AWS Dev Environment
         run: |
-          echo "🚀 Deploying commit ${{ github.sha }} to DEV environment..."
+          echo "Deploying commit ${{ github.sha }} to DEV environment..."
           echo "Status: DEV deployment successful."
 
   # ── STAGE 3: STAGING ENVIRONMENT DEPLOYMENT ─────────────────────────────────
@@ -103,7 +108,7 @@ jobs:
     steps:
       - name: Deploy to AWS Staging Environment
         run: |
-          echo "🚀 Deploying commit ${{ github.sha }} to STAGING environment..."
+          echo "Deploying commit ${{ github.sha }} to STAGING environment..."
           echo "Status: STAGING deployment successful."
 
   # ── STAGE 4: PRODUCTION ENVIRONMENT DEPLOYMENT ──────────────────────────────
@@ -114,12 +119,14 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: Production
+    env:
+      HAS_AWS_CREDS: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
-        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+        if: env.HAS_AWS_CREDS == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -127,16 +134,16 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy to AWS Production ECS Cluster
-        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+        if: env.HAS_AWS_CREDS == 'true'
         run: |
           aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service aivar-backend-prod --force-new-deployment
           aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service aivar-frontend-prod --force-new-deployment
-          echo "✅ Production ECS services updated successfully."
+          echo "Production ECS services updated successfully."
 
       - name: Manual AWS Production Rollout Summary
         run: |
           echo "========================================================="
-          echo "✅ PRODUCTION DEPLOYMENT APPROVED AND EXECUTED"
+          echo "PRODUCTION DEPLOYMENT APPROVED AND EXECUTED"
           echo "Commit SHA: ${{ github.sha }}"
           echo "Target Cluster: ${{ env.ECS_CLUSTER }}"
           echo "========================================================="

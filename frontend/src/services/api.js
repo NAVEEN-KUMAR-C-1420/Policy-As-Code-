@@ -38,19 +38,37 @@ export const PipelineAPI = {
   stream: (accountId, prompt, onMessage, onError, onComplete, signal) => {
     const url = `${API_BASE_URL}/pipeline/stream?account_id=${accountId}&prompt=${encodeURIComponent(prompt)}`;
     const source = new EventSource(url);
-    
+
+    // Track whether the pipeline delivered a Final Response before the
+    // connection closed. EventSource fires onerror on ANY close — including
+    // a normal server-side stream end — so we must distinguish between a
+    // real network failure and a clean completion.
+    let receivedFinalResponse = false;
+
     source.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+
+        // Mark success as soon as the Final Response stage arrives.
+        if (data.stage === 'Final Response' || (data.payload && data.payload.response)) {
+          receivedFinalResponse = true;
+        }
+
         onMessage(data);
       } catch (err) {
         console.error("Failed to parse SSE data", err);
       }
     };
-    
+
     source.onerror = (err) => {
       source.close();
-      if (onError) onError(err);
+      if (receivedFinalResponse) {
+        // Stream ended normally after delivering the response — not an error.
+        if (onComplete) onComplete();
+      } else {
+        // Real failure: stream closed without ever sending a Final Response.
+        if (onError) onError(err);
+      }
     };
 
     if (signal) {

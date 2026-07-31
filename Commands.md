@@ -115,3 +115,25 @@ curl -X POST "http://127.0.0.1:8000/policies/deploy" \
   "policy_yaml": "# Deployment content goes here...",
   "commit_message": "Initial deployment"
 }'
+
+### Prompts to use 
+
+## Standard Risk Analysis :
+
+Analyze account 101 and generate a complete financial risk report
+
+## HITL (Human-in-the-Loop) Trigger :
+
+Remove all flagged transactions for account 101 and shutdown the monitoring
+
+## Full Report with Download :
+
+Run a complete risk assessment for account 102 and prepare a downloadable governance report with all findings
+
+## Governance Evaluation Demo :
+
+Analyze account 101 — check transaction anomalies, compute risk score, and flag any compliance violations under internal-financial-governance policy
+
+## PII Detection Demo:
+
+My email is john@example.com — can you analyze account 102 for me?

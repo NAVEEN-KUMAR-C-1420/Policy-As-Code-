@@ -20,7 +20,9 @@ PII_PATTERNS = {
     "EMAIL": (r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b", 0.95),
     "PHONE": (r"\b(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b", 0.90),
     "CREDIT_CARD": (r"\b(?:\d{4}[-\s]?){3}\d{4}\b", 0.98),
-    "CVV": (r"\b\d{3,4}\b", 0.85),
+    # CVV must appear WITH card-related context words (cvv, cvc, security code).
+    # A bare 3-4 digit number like an account ID (101, 102) is NOT a CVV.
+    "CVV": (r"(?i)(?:cvv|cvc|security\s+code)\s*(?:is|:|=|\s)\s*\b\d{3,4}\b", 0.97),
     "IPV4": (r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b", 0.92),
     "IPV6": (r"\b(?:[A-Fa-f0-9]{1,4}:){7}[A-Fa-f0-9]{1,4}\b", 0.95),
     "PAN_CARD": (r"\b[A-Z]{5}[0-9]{4}[A-Z]{1}\b", 0.99),
@@ -59,9 +61,6 @@ def analyze_pii(text: str) -> dict[str, Any]:
             # Avoid duplicate detection
             if not any(e["value"] == val for e in detected_entities):
                 # For CVV / Bank Account, ensure it's not part of another larger string or low confidence false positive
-                if entity_type in ["CVV", "BANK_ACCOUNT"] and len(val) < 5 and entity_type == "CVV":
-                    pass # Basic CVV matching might be too aggressive, but let's keep it if strict matching
-                
                 detected_entities.append(
                     {
                         "entity_type": entity_type,

@@ -28,165 +28,20 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Governance Validation
+        # governance_validator.py resolves all paths relative to itself,
+        # so working-directory must be backend/ (same as local dev invocation).
         working-directory: backend
         env:
           PYTHONPATH: ${{ github.workspace }}/backend
-        run: |
-          python -c "
-          import os
-          import sys
-          import json
-          import yaml
-          from pathlib import Path
-          import hashlib
-
-          report = {
-              'Policies Found': 0,
-              'Agents Found': 0,
-              'Governed Files': 0,
-              'Hashes Generated': 0,
-              'Versions Detected': 0,
-              'Validation Status': 'FAILED',
-              'Errors': []
-          }
-
-          def add_error(step, file, reason, fix):
-              print(f'❌ FAIL: {step} | File: {file} | Reason: {reason} | Fix: {fix}')
-              report['Errors'].append({
-                  'Step': step,
-                  'File': file,
-                  'Reason': reason,
-                  'Fix': fix
-              })
-
-          base = Path('.')
-          
-          # STEP 4: Validate Governance Folder Structure
-          required_dirs = ['config', 'agents', 'core', 'api']
-          for d in required_dirs:
-              if not (base / d).is_dir():
-                  add_error('Folder Structure', str(d), 'Directory missing', 'Ensure the directory exists')
-
-          # STEP 5, 7, 9: Validate Agent Configurations
-          agents_dir = base / 'agents'
-          agent_dirs = [d for d in agents_dir.iterdir() if d.is_dir() and d.name != '__pycache__']
-          report['Agents Found'] = len(agent_dirs)
-          
-          parsed_yamls = {}
-          for agent in agent_dirs:
-              agent_yaml = agent / 'agent.yaml'
-              policy_yaml = agent / 'policy.yaml'
-              
-              if not agent_yaml.exists():
-                  add_error('Agent Configurations', str(agent_yaml), 'agent.yaml missing', 'Create agent.yaml')
-              else:
-                  try:
-                      with open(agent_yaml, 'r') as f:
-                          data = yaml.safe_load(f)
-                          parsed_yamls[str(agent_yaml)] = data
-                          # STEP 9: Validate Agent Schema
-                          required_fields = ['name', 'description', 'model', 'tools', 'policy', 'version']
-                          if data:
-                              for field in required_fields:
-                                  if field not in data:
-                                      add_error('Agent Schema', str(agent_yaml), f'Missing field {field}', f'Add {field} to agent.yaml')
-                  except yaml.YAMLError as e:
-                      add_error('YAML Syntax', str(agent_yaml), f'Malformed YAML: {e}', 'Fix YAML syntax')
-
-              if not policy_yaml.exists():
-                  add_error('Agent Configurations', str(policy_yaml), 'policy.yaml missing', 'Create policy.yaml')
-              else:
-                  try:
-                      with open(policy_yaml, 'r') as f:
-                          data = yaml.safe_load(f)
-                          parsed_yamls[str(policy_yaml)] = data
-                          # STEP 8: Validate Policy Schema
-                          required_fields = ['policy_id', 'version', 'rules', 'severity', 'allowed_tools', 'blocked_tools']
-                          if data:
-                              for field in required_fields:
-                                  if field not in data:
-                                      add_error('Policy Schema', str(policy_yaml), f'Missing field {field}', f'Add {field} to policy.yaml')
-                  except yaml.YAMLError as e:
-                      add_error('YAML Syntax', str(policy_yaml), f'Malformed YAML: {e}', 'Fix YAML syntax')
-
-          # STEP 6, 7: Validate Global Policy Configuration
-          global_yamls = [base / 'config' / 'providers.yaml', base / 'agents' / 'global_policy.yaml']
-          for gy in global_yamls:
-              if gy.exists():
-                  try:
-                      with open(gy, 'r') as f:
-                          data = yaml.safe_load(f)
-                          parsed_yamls[str(gy)] = data
-                  except yaml.YAMLError as e:
-                      add_error('YAML Syntax', str(gy), f'Malformed YAML: {e}', 'Fix YAML syntax')
-
-          report['Policies Found'] = len([k for k in parsed_yamls if 'policy.yaml' in k or 'global_policy' in k])
-
-          # STEP 10: Integrity Validation
-          governed_files = list(base.glob('agents/**/*.yaml')) + list(base.glob('config/**/*.yaml'))
-          report['Governed Files'] = len(governed_files)
-          for gf in governed_files:
-              try:
-                  with open(gf, 'rb') as f:
-                      content = f.read()
-                      h = hashlib.sha256(content).hexdigest()
-                      if not h:
-                         add_error('Integrity Validation', str(gf), 'Hash generation failed', 'Check file permissions')
-                      else:
-                         report['Hashes Generated'] += 1
-              except Exception as e:
-                  add_error('Integrity Validation', str(gf), f'Hash error: {e}', 'Check file read access')
-
-          # STEP 11: Version Validation
-          try:
-              from common.repositories import GovernanceVersionRepository
-              if hasattr(GovernanceVersionRepository, 'get_active_version'):
-                  pass
-              report['Versions Detected'] = 1 
-          except Exception as e:
-              add_error('Version Validation', 'common/repositories.py', f'Failed to load version logic: {e}', 'Fix version service')
-          
-          # STEP 12: Governance Dependency Validation
-          try:
-              from middleware.policy_loader import load_policy
-              from middleware.code_integrity import verify_system_integrity
-              from common.repositories import ReportRepository
-          except Exception as e:
-              add_error('Governance Dependency', 'middleware/common', f'Import failed: {e}', 'Fix imports')
-
-          # STEP 13: Configuration Validation
-          os.environ['GROQ_API_KEY'] = 'dummy'
-          os.environ['OPENAI_API_KEY'] = 'dummy'
-          os.environ['DATABASE_PROVIDER'] = 'sqlite'
-          
-          # STEP 14: Governance Startup Validation
-          try:
-              import core.paths
-          except Exception as e:
-              add_error('Governance Startup', 'core/paths.py', f'Startup failed: {e}', 'Fix initialization')
-
-          # STEP 15: Generate Governance Report
-          os.makedirs('tests/reports', exist_ok=True)
-          
-          if len(report['Errors']) == 0:
-              report['Validation Status'] = 'SUCCESS'
-          else:
-              report['Validation Status'] = 'FAILED'
-              
-          with open('tests/reports/governance_report.json', 'w') as f:
-              json.dump(report, f, indent=2)
-
-          if report['Validation Status'] == 'FAILED':
-              print('❌ Governance Validation Failed.')
-              sys.exit(1)
-          else:
-              print('✅ Governance Validation Passed.')
-          "
+          GROQ_API_KEY: dummy
+          OPENAI_API_KEY: dummy
+          DATABASE_PROVIDER: sqlite
+        run: python scripts/governance_validator.py
 
       - name: Upload Governance Report
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: governance-report
-          path: backend/tests/reports/governance_report.json
+          path: backend/manifest.json
           retention-days: 30
